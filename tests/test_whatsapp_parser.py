@@ -25,7 +25,7 @@ class TestMaskingReport:
 
     def test_chat_timestamps_are_not_counted_as_phone_numbers(self):
         export = "\n".join(
-            f"[0{day}.06.2026 16:1{day}:00] Barbaros Günay Microsoft: Duyuru {day}"
+            f"[0{day}.06.2026 16:1{day}:00] Eğitmen Microsoft: Duyuru {day}"
             for day in (1, 2, 3)
         )
         report = MaskingReport()
@@ -90,23 +90,31 @@ class TestDateFormats:
 
 
 class TestInstructorRecognition:
-    def test_known_aliases_match(self):
+    """Aliases are configuration, so these tests use invented names throughout.
+
+    A real cohort supplies its own through ``STAJ_ASISTAN_INSTRUCTOR_ALIASES``.
+    """
+
+    IDENTITY = InstructorIdentity(aliases=("örnek eğitmen",))
+
+    def test_saved_contact_variants_match(self):
         for name in (
-            "Barbaros Günay Microsoft",
-            "Barbaros Gunay",
-            "Barbaros GÜNAY",
-            "barbaros",
-            "Barbaros Bey",
+            "Örnek Eğitmen Microsoft",
+            "Ornek Egitmen",
+            "ÖRNEK EĞİTMEN",
+            "örnek  eğitmen",
+            "Örnek Eğitmen Bey",
         ):
-            assert DEFAULT_INSTRUCTOR.matches(name), name
+            assert self.IDENTITY.matches(name), name
 
     def test_participants_do_not_match(self):
         for name in ("Ayşe Yılmaz", "+90 545 156 23 05", "Katılımcı#ab12", ""):
+            assert not self.IDENTITY.matches(name), name
             assert not DEFAULT_INSTRUCTOR.matches(name), name
 
     def test_alias_variant_in_export_is_tagged_as_instructor(self, parsed_messages):
         last = parsed_messages[-1]
-        assert last.sender == "Barbaros Gunay"
+        assert last.sender == "Egitmen"
         assert last.role is AuthorRole.INSTRUCTOR
 
     def test_identity_is_configurable(self):
@@ -115,6 +123,12 @@ class TestInstructorRecognition:
             "[1.07.2026 10:00:00] Dr. Öğretmen: duyuru", instructor=identity
         )
         assert messages[0].role is AuthorRole.INSTRUCTOR
+
+    def test_aliases_come_from_the_environment(self, monkeypatch):
+        monkeypatch.setenv("STAJ_ASISTAN_INSTRUCTOR_ALIASES", "ad soyad, ad soyad kurum")
+        identity = InstructorIdentity()
+        assert identity.matches("Ad Soyad Kurum")
+        assert not identity.matches("Eğitmen")
 
 
 class TestParticipantAnonymity:
@@ -131,7 +145,7 @@ class TestParticipantAnonymity:
         assert first.sender == second.sender
 
     def test_instructor_name_is_preserved(self, parsed_messages):
-        assert parsed_messages[0].sender == "Barbaros Günay Microsoft"
+        assert parsed_messages[0].sender == "Eğitmen Microsoft"
 
 
 def test_looks_like_whatsapp_export(ios_export):

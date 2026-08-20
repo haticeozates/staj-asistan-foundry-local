@@ -20,6 +20,10 @@ data/raw/
 *.xlsx
 !screenshots/.gitkeep
 !data/private/.gitkeep
+# Only screenshots/ may hold images, and only of the app running on sample data.
+# Never commit a chat, desktop, editor or any capture showing real participants.
+!screenshots/
+!screenshots/*.png
 
 # --- Local vector index / model caches ---------------------------------------
 .chroma/

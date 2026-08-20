@@ -294,7 +294,7 @@ def _draft_email(fields: dict, missing: list[str]) -> str:
     lines = [
         "Konu: Summer School listesi düzeltme isteği",
         "",
-        "Merhaba Barbaros Bey,",
+        "Merhaba Hocam,",
         "",
         f"Listedeki kaydımın güncellenmesini rica ediyorum. Ad Soyad: {name}, E-posta: {email}.",
     ]

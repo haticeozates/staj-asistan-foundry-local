@@ -162,8 +162,8 @@ Repository hygiene:
 - Only `data/samples/` is committed, and it is anonymised sample data.
 - A test asserts the committed samples contain no real e-mail addresses, phone numbers or private
   links, so this cannot silently regress.
-- No screenshots of chat content are committed — a chat screenshot would leak the very data the
-  pipeline strips.
+- Images are ignored everywhere except `screenshots/`, which may only hold captures of the app
+  running on sample data — a chat screenshot would leak the very data the pipeline strips.
 
 **Verified on the real corpus:** three exports, 2,108 messages after cleanup (543 from the
 instructor), **3,215 personal data items masked, zero leaks** — no e-mail address, phone number or
@@ -280,10 +280,12 @@ Walkthrough with expected behaviour: [`docs/demo_script.md`](docs/demo_script.md
 
 ## Screenshots
 
-`screenshots/` is intentionally empty in this repository. Screenshots of the assistant answering
-questions over the real corpus would show participant messages, so they are produced locally for
-the presentation and not committed. Reproduce them with the sample data by running the four demo
-questions above.
+`screenshots/` is the only directory in this repository that may contain images, and only under
+one condition: the capture must show this application running on the anonymised sample data.
+
+Do not commit a screenshot of a chat window, a desktop, an editor, or anything showing the real
+corpus — a single such image undoes the masking the rest of the pipeline performs. Reproduce the
+images by pressing **Örnek veri** and running the four demo questions above.
 
 ## Limitations
 

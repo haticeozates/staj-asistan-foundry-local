@@ -107,7 +107,9 @@ class PrivacyPolicy:
         default_factory=lambda: _BASE_PRIVATE_HOSTS | _private_hosts_from_env()
     )
     #: ``@mentions`` that are program roles rather than personal handles.
-    keep_mentions: frozenset[str] = frozenset({"barbaros", "microsoft", "everyone", "herkes"})
+    keep_mentions: frozenset[str] = frozenset(
+        {"eğitmen", "egitmen", "instructor", "microsoft", "everyone", "herkes"}
+    )
     salt: str = "staj-asistan"
 
 

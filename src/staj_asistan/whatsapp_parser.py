@@ -5,8 +5,8 @@ Real exports are messier than the format suggests:
 * iOS wraps senders and phone numbers in Unicode bidi isolates
 * long announcements span dozens of lines, including tab-separated tables
 * joins, security-code notices and "media omitted" markers are noise
-* the same instructor appears as ``Barbaros Günay Microsoft``, ``Barbaros Gunay``
-  or just ``Barbaros`` depending on who saved the contact
+* the same instructor appears under several spellings — full name with the organisation
+  suffix, an ASCII-folded variant, or just a first name — depending on who saved the contact
 
 Everything here is deterministic and unit-tested; no model is involved.
 """
@@ -91,11 +91,12 @@ def _fold(text: str) -> str:
     return re.sub(r"\s+", " ", ascii_only).strip().lower()
 
 
+#: Deliberately generic. The real instructor's name belongs to a person, so it is supplied
+#: per cohort through ``STAJ_ASISTAN_INSTRUCTOR_ALIASES`` rather than shipped in the repo.
 _DEFAULT_INSTRUCTOR_ALIASES = (
-    "barbaros gunay microsoft",
-    "barbaros gunay",
-    "barbaros günay",
-    "barbaros",
+    "eğitmen",
+    "egitmen",
+    "instructor",
 )
 
 

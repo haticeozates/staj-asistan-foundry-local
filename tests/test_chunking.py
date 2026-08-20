@@ -19,7 +19,7 @@ def message(text, *, sender="Katılımcı#0001", role=AuthorRole.PARTICIPANT, mi
 
 
 def instructor(text, **kwargs):
-    kwargs.setdefault("sender", "Barbaros Günay Microsoft")
+    kwargs.setdefault("sender", "Eğitmen Microsoft")
     return message(text, role=AuthorRole.INSTRUCTOR, **kwargs)
 
 
@@ -31,7 +31,7 @@ class TestMetadataPreservation:
         ]
         chunk = chunk_messages(messages)[0]
         assert chunk.source == "grup1"
-        assert chunk.senders == ("Katılımcı#0001", "Barbaros Günay Microsoft")
+        assert chunk.senders == ("Katılımcı#0001", "Eğitmen Microsoft")
         assert chunk.start_time == datetime(2026, 7, 24, 9, 0)
         assert chunk.end_time == datetime(2026, 7, 24, 9, 2)
         assert chunk.message_count == 2
@@ -52,7 +52,7 @@ class TestMetadataPreservation:
 
     def test_chunk_text_keeps_speaker_and_date(self):
         chunk = chunk_messages([instructor("Sertifika tek.")])[0]
-        assert "Barbaros Günay Microsoft" in chunk.text
+        assert "Eğitmen Microsoft" in chunk.text
         assert "24.07.2026" in chunk.text
 
     def test_chunk_ids_are_unique_and_source_scoped(self):
@@ -109,7 +109,7 @@ class TestLongAnnouncements:
 
     def test_every_part_keeps_the_speaker_header(self):
         chunks = chunk_messages([instructor(self.LONG)])
-        assert all("Barbaros Günay Microsoft" in c.text for c in chunks)
+        assert all("Eğitmen Microsoft" in c.text for c in chunks)
 
     def test_every_part_keeps_instructor_role(self):
         chunks = chunk_messages([instructor(self.LONG)])
@@ -141,4 +141,4 @@ class TestPlainDocuments:
 
 def test_format_message_shape():
     rendered = format_message(instructor("merhaba"))
-    assert rendered == "[24.07.2026 09:00] Barbaros Günay Microsoft: merhaba"
+    assert rendered == "[24.07.2026 09:00] Eğitmen Microsoft: merhaba"

@@ -19,7 +19,7 @@ def chunk(chunk_id, text, *, instructor=False, day=1, source="grup1"):
         text=text,
         source=source,
         role=AuthorRole.INSTRUCTOR if instructor else AuthorRole.PARTICIPANT,
-        senders=("Barbaros Günay Microsoft",) if instructor else ("Katılımcı#0001",),
+        senders=("Eğitmen Microsoft",) if instructor else ("Katılımcı#0001",),
         start_time=datetime(2026, 7, day, 10, 0),
         instructor_ratio=1.0 if instructor else 0.0,
     )
@@ -28,21 +28,21 @@ def chunk(chunk_id, text, *, instructor=False, day=1, source="grup1"):
 CORPUS = [
     chunk(
         "c1",
-        "Barbaros Günay Microsoft: Final teslimi için bana kaynak kodun olduğu bir link "
+        "Eğitmen Microsoft: Final teslimi için bana kaynak kodun olduğu bir link "
         "(github mesela) ve ne yaptığınızı anlatan kısa bir video linki e-mail atın.",
         instructor=True,
         day=24,
     ),
     chunk(
         "c2",
-        "Barbaros Günay Microsoft: Sertifika tek, projeyi bitiren herkese Ağustos ortasına "
+        "Eğitmen Microsoft: Sertifika tek, projeyi bitiren herkese Ağustos ortasına "
         "kadar sertifika gönderiyorum.",
         instructor=True,
         day=27,
     ),
     chunk(
         "c3",
-        "Barbaros Günay Microsoft: Foundry Local disconnected bir ortamda çözüm yaratma "
+        "Eğitmen Microsoft: Foundry Local disconnected bir ortamda çözüm yaratma "
         "deneyimi sunuyor, küçük modeller birçok problemde yeterli olabiliyor.",
         instructor=True,
         day=13,

@@ -75,7 +75,7 @@ class TestIndexing:
 
         archive = tmp_path / "export.zip"
         with zipfile.ZipFile(archive, "w") as zf:
-            zf.writestr("_chat.txt", "[1.07.2026 10:00:00] Barbaros Günay Microsoft: duyuru metni")
+            zf.writestr("_chat.txt", "[1.07.2026 10:00:00] Eğitmen Microsoft: duyuru metni")
             zf.writestr("PHOTO-2026.jpg", b"\xff\xd8\xff\xe0binary")
         sources = ingest_bytes(archive.read_bytes(), "export.zip")
         assert len(sources) == 1

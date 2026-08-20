@@ -162,7 +162,7 @@ class TestHandles:
         assert "ornekkullanici" not in result.text
 
     def test_instructor_mention_is_kept(self):
-        assert "@Barbaros" in mask_text("@Barbaros hocam merhaba").text
+        assert "@egitmen" in mask_text("@egitmen hocam merhaba").text
 
 
 class TestBidiAndWhitespace:

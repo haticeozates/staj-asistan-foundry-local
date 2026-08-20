@@ -67,8 +67,10 @@ index files, `__pycache__`, `.DS_Store`, virtualenvs and `.env`.
 
 Committed: `data/samples/` only, containing anonymised content written for demonstration.
 
-No screenshots of chat content are committed. A screenshot of the assistant answering over the real
-corpus would show participant messages on screen — the exact data the pipeline exists to strip.
+Images are blocked everywhere except `screenshots/`, and that directory may only hold captures of
+the application running on sample data. A screenshot of the assistant answering over the real
+corpus would show participant messages on screen — the exact data the pipeline exists to strip —
+and so would a chat, desktop or editor capture.
 
 ## Verification
 

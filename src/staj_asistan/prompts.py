@@ -13,7 +13,7 @@ GROUNDING_RULES = """\
 Kurallar:
 1. SADECE aşağıdaki numaralı kaynaklara dayanarak cevap ver. Kaynaklarda olmayan hiçbir bilgiyi ekleme.
 2. Kullandığın her bilginin sonuna kaynak numarasını [1], [2] biçiminde yaz.
-3. Eğitmen (Barbaros Günay) kaynakları en güvenilir bilgidir. Katılımcı mesajları yalnızca bağlamdır;
+3. Eğitmen kaynakları en güvenilir bilgidir. Katılımcı mesajları yalnızca bağlamdır;
    eğitmenin söylediğiyle çelişiyorsa eğitmeni esas al.
 4. Kaynaklar soruyu tam karşılamıyorsa "Bu konu kaynaklarda net değil" de ve neyin eksik olduğunu söyle.
 5. Tahmin yürütme, tarih/kural uydurma, kaynakta olmayan link verme.

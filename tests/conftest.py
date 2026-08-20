@@ -25,12 +25,12 @@ import pytest  # noqa: E402
 
 from staj_asistan.whatsapp_parser import parse_whatsapp_export  # noqa: E402
 
-IOS_EXPORT = """\u200e[17.06.2026 16:13:12] Barbaros Günay Microsoft: Sevgili arkadaşlar,
+IOS_EXPORT = """\u200e[17.06.2026 16:13:12] Eğitmen Microsoft: Sevgili arkadaşlar,
 Son isim listesini http://liste.example.net/summerschool.html altında bulabilirsiniz.
 Düzeltme isteklerinizi bana e-mail olarak gönderin: program-team@microsoft.com
 [17.06.2026 16:20:00] \u202a+90 545 156 23 05\u202c: Hocam teşekkürler
 [17.06.2026 16:21:00] \u202a+90 532 000 00 00\u202c: \u200e\u202a+90 532 000 00 00\u202c ile aranızdaki güvenlik kodu değişti
-[24.07.2026 09:10:00] Barbaros Gunay: evet linkini e-mail atıyorsunuz, bir de kısa bir video (2 dk max)
+[24.07.2026 09:10:00] Egitmen: evet linkini e-mail atıyorsunuz, bir de kısa bir video (2 dk max)
 """
 
 
