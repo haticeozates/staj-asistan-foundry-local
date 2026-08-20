@@ -329,10 +329,10 @@ Stated plainly, because knowing where a system is weak is part of shipping it:
   before indexing, means no later code path can leak.
 - **The test fixtures were the leak, not the data pipeline.** A pre-push audit that cross-checked
   every e-mail, link, handle and digit sequence in the repository against the raw exports found
-  nine values I had pasted from real chats into test files while debugging — including a live
-  WhatsApp group invite link and a real OneDrive share. The masking pipeline was clean the whole
-  time; the tests that verified it were not. Sanitising the output is not the same as sanitising
-  the workbench.
+  eleven values I had pasted from real chats into test files while debugging — including a live
+  WhatsApp group invite link, a real OneDrive share, and the password to the roster page. The
+  masking pipeline was clean the whole time; the tests that verified it were not. Sanitising the
+  output is not the same as sanitising the workbench.
 - **Pointing a guard at my own committed files found two real bugs.** The test that scans
   `data/samples/` for personal data failed immediately: the phone matcher was reading chat
   timestamps like `[17.06.2026 16:13]` as phone numbers, which meant a message containing a
