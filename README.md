@@ -249,7 +249,7 @@ staj-asistan stats
 ## Test
 
 ```bash
-pytest                    # 202 tests, ~1 second, fully offline
+pytest                    # 203 passed, 18 skipped, ~1 second, fully offline
 ```
 
 Tests that load a real embedding model are opt-in, so the default run stays fast:
@@ -302,8 +302,9 @@ Stated plainly, because knowing where a system is weak is part of shipping it:
 - **Stemming is fixed-length truncation**, a strong Turkish baseline but not a real morphological
   analyser; it occasionally conflates unrelated words that share a five-character prefix.
 - **Single-turn.** There is no conversation memory, so follow-up questions must be self-contained.
-- **The instructor is identified by name aliases**, which would need reconfiguration for another
-  program cohort.
+- **Instructor recognition is cohort configuration.** Sample data uses the generic sender
+  ``Eğitmen``. A real export needs ``STAJ_ASISTAN_INSTRUCTOR_ALIASES`` set locally; those names
+  are not stored in this repository.
 - **Retrieval thresholds are calibrated on this corpus** and would need re-measuring on a very
   different one.
 

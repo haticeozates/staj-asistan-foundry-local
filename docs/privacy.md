@@ -46,8 +46,11 @@ and phone numbers are never shipped as defaults, because they belong to a person
 
 - **Public documentation links** (`learn.microsoft.com`, `github.com`, `pypi.org`). They are not
   personal data, and stripping them would make technical answers useless.
-- **The instructor's display name.** The whole point of authority weighting is knowing which
-  messages are his, and his role in the programme is public.
+- **A generic instructor label in sample data.** Committed announcements use the role name
+  ``Eğitmen`` / ``Instructor``, not a real person's display name. Authority weighting still
+  works because it keys off that role, not off a private identity. On a real export, instructor
+  recognition is supplied locally through ``STAJ_ASISTAN_INSTRUCTOR_ALIASES`` and is never
+  shipped in this repository.
 - **RFC 2606 documentation domains** (`example.com` and friends). They cannot belong to a real
   person, and keeping them lets the sample files show what a complete correction request looks
   like.

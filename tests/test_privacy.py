@@ -42,21 +42,26 @@ class TestEmails:
 
 
 class TestPhones:
+    """Phone strings below are synthetic fixtures, not copied from a real export.
+
+    They exist only to cover bidi wrapping, NBSP, grouping, and country-code shapes.
+    """
+
     @pytest.mark.parametrize(
         "raw",
         [
-            "\u202a+90 545 156 23 05\u202c",
-            "+90 545 156 23 05",
-            "+90\u00a0545\u00a0156\u00a023\u00a005",
-            "0545 156 23 05",
-            "+31 6 12345678",
-            "0 (545) 156-23-05",
+            "\u202a+90 000 111 22 33\u202c",
+            "+90 000 111 22 33",
+            "+90\u00a0000\u00a0111\u00a022\u00a033",
+            "0000 111 22 33",
+            "+31 6 11111111",
+            "0 (000) 111-22-33",
         ],
     )
     def test_phone_variants_are_masked(self, raw):
         result = mask_text(f"Numaram {raw} arayabilirsiniz")
         assert PHONE_PLACEHOLDER in result.text
-        assert "156" not in result.text
+        assert "111" not in result.text
 
     @pytest.mark.parametrize(
         "raw",
@@ -191,10 +196,10 @@ class TestPseudonyms:
 class TestPolicyToggles:
     def test_masking_can_be_narrowed(self):
         policy = PrivacyPolicy(mask_phones=False)
-        assert "+90 545 156 23 05" in mask_text("+90 545 156 23 05", policy).text
+        assert "+90 000 111 22 33" in mask_text("+90 000 111 22 33", policy).text
 
     def test_report_totals_add_up(self):
-        result = mask_text("a@b.com ve +90 545 156 23 05 ve https://1drv.ms/x")
+        result = mask_text("a@b.com ve +90 000 111 22 33 ve https://1drv.ms/x")
         assert result.report.total == 3
 
 
