@@ -1,0 +1,45 @@
+# Final Teslim Notları (anonimleştirilmiş özet)
+
+Bu dosya, program duyurularından derlenmiş teslim kurallarının düz metin özetidir.
+Gerçek katılımcı verisi içermez; sadece kuralları ve tipik durumları anlatır.
+
+## Zorunlu teslim kalemleri
+
+1. Kaynak kod linki
+   - GitHub ilk tercih. GitHub kullanamıyorsanız erişilebilir bir public link de kabul ediliyor.
+   - Repo public olmalı; eğitmen linkleri listede tüm ekiple paylaşıyor.
+
+2. Kısa demo videosu
+   - Süre 2 dakikayı geçmemeli, 2-3 dakika üst sınır olarak konuşuldu.
+   - İçerik iki sorudan ibaret: ne yaptım, ne öğrendim.
+   - Ekip halinde çalışılsa bile her katılımcıdan ayrı video bekleniyor.
+   - Video GitHub reposunun içinde dursa bile e-postada ayrı bir link olarak verilmeli.
+
+3. Linklerin e-posta ile gönderilmesi
+   - Teslim, WhatsApp mesajı ile değil e-posta ile yapılıyor.
+   - Tek e-postada hem kod linki hem video linki bulunmalı.
+
+## Önerilen ama zorunlu olmayan
+
+- README: kurulum adımları, mimari özeti, çalıştırma komutları ve demo soruları.
+- Ekran görüntüleri veya kısa bir mimari şeması.
+
+## Zamanlama
+
+- Teslimler Ağustos içinde esnek; Eylül'e bırakılmaması isteniyor.
+- Eylül başı son tarih olarak konuşuldu, sonrasında staj grubu kapanıyor.
+- Temmuz'da bitirenler için sertifikalar Ağustos ortasına kadar hazırlanıyor.
+
+## Sertifika
+
+- Katılımcı başına tek sertifika veriliyor; iki proje yapmak ikinci sertifika getirmiyor.
+- Sertifikalar listede görünen ada basılıyor, bu yüzden ad-soyad alanı kritik.
+- Sertifikalar batch halinde gönderiliyor; videolar izlendikten sonra gönderim yapılıyor.
+- Listede sertifika alanı işaretli görünüp e-posta ulaşmadıysa eğitmene yazılması gerekiyor.
+
+## Sık karşılaşılan durumlar
+
+- "GitHub repom hazır ama video çekmedim" → teslim eksik sayılır, video zorunlu.
+- "Video çektim ama e-posta atmadım" → teslim kayda geçmez, e-posta zorunlu.
+- "Listede GitHub linkim görünmüyor" → linkler videolar izlendikten sonra ekleniyor, beklemek gerekiyor.
+- "Listem güncellenmedi, çalışmayı durdurayım mı" → hayır; liste gecikmeli güncelleniyor, çalışmaya devam edilmeli.

@@ -1,0 +1,40 @@
+# Düzeltme İsteği Örnekleri (anonimleştirilmiş / sentetik)
+
+Bu dosyadaki mesajlar gerçek katılımcı mesajları değildir. Düzeltme sürecinin
+kurallarını ve tipik hata biçimlerini göstermek için yazılmış örneklerdir.
+
+## Süreç kuralları
+
+- Düzeltme istekleri WhatsApp grubuna değil, eğitmene e-posta olarak gönderilir.
+- E-postada ad-soyad ve listede kayıtlı e-posta adresi mutlaka bulunmalıdır;
+  eğitmen doğru satırı ancak bu iki alanla eşleştirebiliyor.
+- Düzeltmeler anında uygulanmaz; haftada bir-iki kez toplu olarak ve insan kontrolüyle işlenir.
+- Değiştirilebilen alanlar: ad-soyad, e-posta, proje, dil, devam durumu, tarih aralığı.
+- Proje seçenekleri: Stock Price Prediction with PyTorch, Building Your First Local RAG
+  Application with Foundry Local, Quantum Kickstart with Q#, Titanic Survival Analysis
+  (sadece lise öğrencileri), Kendi projem.
+- Dil seçenekleri: Türkçe, English.
+- Devam durumu seçenekleri: "Devam etmek istiyorum", "Devam etmek istemiyorum".
+
+## Eksik bilgi içeren örnekler
+
+Örnek 1: "Listede adım yanlış görünüyor, düzeltir misiniz?"
+Sorun: Ad-soyad ve e-posta yok, doğru satır bulunamaz. Ayrıca doğru yazımın ne olduğu belirtilmemiş.
+
+Örnek 2: "Projem Foundry Local olacak."
+Sorun: Kimlik bilgisi yok. Ayrıca mesaj WhatsApp'a yazılmış, e-posta gönderilmemiş.
+
+Örnek 3: "Hocam ben devam etmek istiyorum, listede istemiyorum yazıyor."
+Sorun: Kimlik bilgisi yok; hangi satır olduğu anlaşılamıyor.
+
+## Yeterli bilgi içeren örnek
+
+Örnek 4: "Ad Soyad: Örnek Katılımcı, e-posta: ornek@example.com.
+Listedeki projem Stock Price Prediction with PyTorch görünüyor, Building Your First Local
+RAG Application with Foundry Local olarak güncellenmesini rica ediyorum. Devam etmek istiyorum."
+Değerlendirme: Kimlik, mevcut değer, istenen yeni değer ve devam durumu net; e-posta ile gönderilirse işlenebilir.
+
+## Sık sorulan durum
+
+"Listeye bakınca satırım hâlâ eski. Çalışmaya ara vereyim mi?"
+Cevap: Hayır. Liste gecikmeli güncelleniyor, bu süreçte projeye devam edilmesi bekleniyor.

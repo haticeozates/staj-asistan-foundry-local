@@ -1,0 +1,62 @@
+[17.06.2026 16:13:12] Barbaros Günay Microsoft: Sevgili arkadaşlar,
+
+Son isim listesini pinli mesajdaki adreste bulabilirsiniz. Düzeltmeler için doğal dile dönüyoruz :-)
+
+Sizlerden ricam
+- Kendi satırınızı kontrol edip düzeltme isteklerinizi bana e-mail olarak gönderin lütfen
+- İsminiz hala yoksa yine bana e-mail atın
+- İsim ve e-mail alanı en önemli kısım. Sertifikalar o isimlere basılacak.
+- Düzeltmeleri anında olacak diye beklemeyin. Haftada 1-2 defa boşluk yakaladıkça listeyi güncelliyorum.
+- Opsiyonlar:
+Diller: Türkçe, English
+Projeler:
+Stock Price Prediction with PyTorch
+Building Your First Local RAG Application with Foundry Local
+Quantum Kickstart with Q#
+(Sadece Lise Öğrencileri için) Titanic Survival Analysis
+Kendi projem
+Devam: Devam etmek istiyorum / Devam etmek istemiyorum
+Tarihler: 1 Haziran - 15 Eylül arası bir seçim
+[17.06.2026 18:02:10] Ayşe Örnek: Hocam listede adım eski haliyle duruyor, mail attım ama değişmemiş
+[17.06.2026 18:20:44] Barbaros Günay Microsoft: Düzelecek, hiç problem değil. Liste gecikmeli güncelleniyor, siz çalışmaya devam edin.
+[21.06.2026 11:05:00] Barbaros Günay Microsoft: Birden fazla kişi de yapsanız herkesten tek tek "ne yaptım, ne öğrendim" videosu bekliyorum, 2-3 dk.
+[22.06.2026 09:40:12] Barbaros Günay Microsoft: Olur tabii, önemli olan yeni bir şeyler öğrenip projeyi bitirmeniz.
+[13.07.2026 21:14:03] Barbaros Günay Microsoft: Disconnected bir ortamda çözüm yaratma deneyimi sunuyor Foundry Local. Küçük modeller birçok problemde yeterli de olabiliyor, yapay zekâya ulaşılabilirliği artırmış oluyor. Kesinlikle kullanamaz durumda değilseniz güzel bir deneyim, bir denemenizi tavsiye ederim.
+[16.07.2026 10:22:31] Barbaros Günay Microsoft: Projeyi bitirince GitHub'a yükleyebilirsiniz.
+[16.07.2026 10:23:05] Barbaros Günay Microsoft: Video da kısa bir video. 2 dakikada ne yaptığınızı ve ne öğrendiğinizi anlatıp onu da GitHub'a koyabilirsiniz veya başka bir platforma.
+[16.07.2026 10:24:40] Barbaros Günay Microsoft: Bana proje ve video linklerini e-mail atıyorsunuz.
+[17.07.2026 14:02:18] Mert Örnek: Kaynak kodu illa GitHub'da mı olmalı?
+[17.07.2026 14:05:52] Barbaros Günay Microsoft: Evet, GitHub ilk tercih, veya bir public link.
+[17.07.2026 14:31:09] Barbaros Günay Microsoft: Bana gönderdiğiniz linkleri liste içinde tüm ekiple paylaşacağım.
+[17.07.2026 14:33:47] Barbaros Günay Microsoft: Bitirdiğiniz zaman gönderin ama Eylül'e bırakmamaya çalışın.
+[22.07.2026 19:11:02] Barbaros Günay Microsoft: Paylaşabileceğiniz herhangi bir yere koyabilirsiniz, bana sadece linki gerekiyor. Linkleri dosyaya ekleyeceğim herkesin ulaşabilmesi için.
+[22.07.2026 19:12:40] Barbaros Günay Microsoft: Sertifika konusunda sorun çıkmaz, Ağustos - Eylül başı hazırlayabilirim.
+[22.07.2026 19:13:20] Barbaros Günay Microsoft: İlk projeyi bitirenler Ağustos'ta alır sertifikayı.
+[24.07.2026 09:10:00] Barbaros Günay Microsoft: Evet linkini e-mail atıyorsunuz, bir de kısa bir videoda (2 dk max) ne yaptığınızı / ne öğrendiğinizi anlatıp onun da linkini atarsanız süper olur. Bir konuyu 2 dakikada anlatmayı başarmanın sizlere yararlı olacağını düşünüyorum.
+[25.07.2026 08:45:19] Barbaros Günay Microsoft: Evet linkler yeterli, 2 dakikayı geçmese iyi olur. Ne yaptım, ne öğrendim, o kadar.
+[28.07.2026 12:00:00] Zeynep Örnek: İki proje yaparsak iki sertifika mı alıyoruz?
+[28.07.2026 12:04:11] Barbaros Günay Microsoft: Sertifika tek. İki proje yaparsanız ben arşivlerim ama bir tane yapınca sertifika veriyorum.
+[28.07.2026 12:06:30] Barbaros Günay Microsoft: Sertifika için bir tane yeterli.
+[28.07.2026 12:40:05] Barbaros Günay Microsoft: Ağustos içinde esnek, Eylül'e kalmasa iyi olur.
+[30.07.2026 17:20:44] Barbaros Günay Microsoft: Eylül'de staj grubu kapanıyor, okul kulüpleriyle planlama yapmaya başlıyoruz.
+[01.08.2026 10:15:23] Barbaros Günay Microsoft: Sadece ne yaptığınızı ve ne öğrendiğinizi anlatan bir video linki, bir de source code'un olduğu bir link (GitHub mesela).
+[01.08.2026 10:18:00] Barbaros Günay Microsoft: Sertifikalar burada görünen isimlere çıkacağı için, projeyi bitiren arkadaşların isim düzeltmesi yapmak için son 1-2 haftasına girdik.
+[03.08.2026 13:05:41] Barbaros Günay Microsoft: Katılımcılarımızdan gelen teknik bir notu paylaşmak istedim: Foundry Local Python SDK'sı varsayılan kurulumda hata vermeden modelleri sessizce CPU üzerinde çalıştırabiliyor. Kataloğun CUDA modellerini görebilmesi için başlangıçta download_and_register_eps() ile execution provider'ları kaydetmek, ardından select_variant() ile GPU varyantını açıkça seçmek gerekiyor. Bu iki adımdan sonra inferans hızında ciddi artış oluyor.
+[10.08.2026 09:30:12] Barbaros Günay Microsoft: Listeyi güncelledim. GitHub linkleri dışında baktığımda düzgün görünüyordu, bir kontrol edersiniz satırınızı. Şu anda GitHub linkleri listede yok; videoları seyrettikten sonra ekleyeceğim.
+[10.08.2026 09:34:50] Barbaros Günay Microsoft: GitHub linkleri sizi yanıltmasın, ben seyrettikten sonra gelecekler.
+[11.08.2026 20:02:15] Barbaros Günay Microsoft: Bu liste sadece benim takibim için. Sertifikalar pinli listedeki isimler üzerinden gidecek, orada yanlışsa oradaki kayıt için düzeltme isteyebilirsiniz.
+[13.08.2026 11:45:00] Barbaros Günay Microsoft: Proje bitirme mail'ı ise ok, videoları seyredip sertifikaları göndereceğim, sonraki batch'e geçeceğim.
+[15.08.2026 16:20:33] Deniz Örnek: Video GitHub reposunun içinde duruyor, ayrıca link atmama gerek var mı?
+[15.08.2026 16:24:07] Barbaros Günay Microsoft: GitHub'ta dursa bile ayrı link iyi olur mailde.
+[17.08.2026 10:00:00] Barbaros Günay Microsoft: Sadece e-mail, link.
+[18.08.2026 08:12:44] Barbaros Günay Microsoft: İlk gruba sertifikalar gönderilmeye başlandı. 11 Ağustos sonrası 2. batch, bir haftaya videoları bitiririm.
+[18.08.2026 08:15:10] Barbaros Günay Microsoft: Listede sertifika alanında 1 görünüyorsa ama size ulaşmadıysa bana e-mail atın.
+[19.08.2026 09:05:00] Barbaros Günay Microsoft: GitHub'a öğrenci kimliği ile abone olup, GitHub hesabı ile Azure alma önerisi gelmişti daha önce, ona da bakabilirsiniz.
+[05.07.2026 15:12:00] Kerem Örnek: Projeyi Python ile geliştirebilir miyim, yoksa C# şart mı?
+[05.07.2026 15:18:22] Barbaros Günay Microsoft: Python tamamen serbest, dil kısıtı yok. Önemli olan projeyi bitirmeniz ve ne öğrendiğinizi anlatabilmeniz.
+[06.07.2026 11:02:14] Selin Örnek: Foundry Local kurdum ama uygulama modele bağlanamıyor, ne kontrol etmeliyim?
+[06.07.2026 11:20:39] Barbaros Günay Microsoft: Önce servisin ayakta olduğundan emin olun, sonra hangi portta dinlediğini kontrol edin. Foundry Local OpenAI uyumlu bir endpoint açıyor, uygulamanızda base URL'i o adrese ve yüklü model adına göre ayarlamanız gerekiyor. Model yüklü değilse önce modeli çalıştırın.
+[06.07.2026 11:25:04] Barbaros Günay Microsoft: Bir de küçük modellerle başlayın, ilk denemede büyük model indirmeye çalışmayın; disk ve bellek sınırına takılıyorsunuz.
+[08.07.2026 17:41:55] Kerem Örnek: Local RAG mimarisini nasıl kuracağız, örnek bir akış var mı?
+[08.07.2026 17:55:10] Barbaros Günay Microsoft: Klasik akış yeterli: belgeleri parçalara ayırın, her parça için embedding çıkarın, bir vektör veritabanına koyun, soru geldiğinde en yakın parçaları bulup modele bağlam olarak verin. Hepsi local çalışabilir, internet gerekmiyor. Önemli olan cevabın hangi parçadan geldiğini gösterebilmeniz.
+[09.07.2026 10:05:33] Barbaros Günay Microsoft: Projenin GitHub'da düzenli görünmesi için README'ye kurulum adımlarını, nasıl çalıştırılacağını ve birkaç örnek soruyu koyun. Değerlendirirken ilk oraya bakıyorum.

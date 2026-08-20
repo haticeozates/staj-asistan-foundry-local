@@ -1,0 +1,89 @@
+# Final presentation outline
+
+Target: 8–10 minutes, roughly half of it live demo.
+
+The through-line: *I did not build a chatbot over some documents. I found a real operational
+problem in this programme, and the constraints of that problem — privacy, authority, ambiguity —
+are what produced the design.*
+
+---
+
+## 1. The problem (1 min)
+
+Three WhatsApp groups, three months, 2,100+ messages. The same five questions asked every week.
+The answers exist, but they are two-word replies buried in a thread from July.
+
+Two details worth stating, because they shape everything after:
+
+- The chat history contains names, e-mail addresses, phone numbers and a roster of hundreds of
+  participants. It cannot be pasted into a cloud assistant.
+- Some questions were answered by participants, confidently and incorrectly.
+
+## 2. What I built (1 min)
+
+A local RAG assistant on Foundry Local, with four modes: instructor Q&A, submission checklist,
+correction request analyzer, and technical help. Turkish answers, every one with citations.
+
+One sentence for why local: the data is exactly the kind you must not upload, and the corpus is
+small enough that a small local model with good retrieval beats a large remote one that cannot
+legally see it.
+
+## 3. Architecture (1.5 min)
+
+One diagram, four things to say:
+
+- Masking happens **at ingestion**, so the index never contains personal data.
+- Retrieval is **hybrid** — embeddings plus lexical — because programme vocabulary is exact.
+- Instructor messages are **weighted**, participant guesses damped.
+- **No evidence means no model call.** The refusal path is structural.
+
+Do not read the module list. It is in the README.
+
+## 4. Live demo (4 min)
+
+Follow [`demo_script.md`](demo_script.md): grounded answer → authority weighting → checklist →
+correction analyzer → refusal.
+
+Finish on the refusal. It is the least common thing to demo and the most convincing.
+
+## 5. Engineering decisions worth defending (1.5 min)
+
+Pick two or three; do not list all of them.
+
+- **Additive boosting was a bug.** Adding a constant to instructor chunks made every instructor
+  message clear the refusal threshold for every question. Multiplying fixed it. A test for an
+  out-of-scope question caught it.
+- **Chunking beat scoring.** Grouping short replies with the question they answer improved results
+  more than any retrieval tuning, because the most valuable instructor answers are two words long.
+- **A test that scanned my own sample files found two real bugs**: chat timestamps were being read
+  as phone numbers, and the "masked items" counter was measuring the wrong text.
+- **Thresholds are calibrated per embedding backend**, from measurements, because a similarity
+  score means different things in different embedding spaces.
+
+## 6. Honest limitations (30 sec)
+
+Say these before anyone asks:
+
+- The dependency-free fallback backend refuses out-of-scope questions poorly — 4 of 9 versus 9 of 9
+  for real embeddings. Measured, documented, and the reason a real backend is recommended.
+- No Turkish NER, so a name inside free-form prose can survive masking.
+- Single-turn; no conversation memory.
+
+Knowing where a system is weak is part of shipping it.
+
+## 7. What I learned (1 min)
+
+- Grounding is an architecture decision, not a prompt instruction.
+- Privacy is easier as an ingestion-time invariant than as a display-time filter.
+- Retrieval quality was mostly about the shape of the data, not the cleverness of the scoring.
+- Writing the refusal path first changed every design decision that followed.
+
+## Questions to expect
+
+| Question | Answer |
+| --- | --- |
+| Why not use a cloud model? | The input data is personal. Also unnecessary: the generation step only has to summarise retrieved snippets. |
+| What if Foundry Local is not running? | Retrieval still works; generation degrades to verbatim quotation, clearly labelled. Hallucination becomes impossible. |
+| How do you know retrieval works? | A 21-question evaluation set: 12 in-scope answered, 9 out-of-scope refused with real embeddings. |
+| Could it update the roster automatically? | It could. It should not. It drafts; a human approves. |
+| Does it work on other WhatsApp exports? | Yes — both iOS and Android formats, six date variants, all tested. The instructor aliases are configuration. |
