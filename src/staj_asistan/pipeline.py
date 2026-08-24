@@ -30,6 +30,7 @@ from .ingestion import (
 from .models import (
     Answer,
     AssistantMode,
+    ChunkCategory,
     Citation,
     EvidenceLevel,
     IndexStats,
@@ -43,6 +44,7 @@ from .prompts import (
     build_user_prompt,
 )
 from .retriever import RetrievalConfig, Retriever
+from .topics import filter_scored_chunks, infer_query_topic
 from .vector_store import VectorStore, build_vector_store
 from .whatsapp_parser import DEFAULT_INSTRUCTOR, InstructorIdentity
 from .workflows import analyze_correction_request, analyze_submission
@@ -140,7 +142,32 @@ class Assistant:
         # then apply only the mode-specific authority weights on top.
         config = replace(self.retrieval, **MODE_RETRIEVAL_OVERRIDES.get(mode, {}))
         retriever = Retriever(self.store, self.embedding_backend, config)
-        return retriever.retrieve(query, top_k=top_k)
+        return filter_scored_chunks(retriever.retrieve(query, top_k=top_k), query, mode)
+
+    def _prune_results(
+        self,
+        results: list[ScoredChunk],
+        evidence: EvidenceLevel,
+        query: str,
+        mode: AssistantMode,
+    ) -> list[ScoredChunk]:
+        """Keep the citation panel small: top 2 on high evidence, otherwise at most 3.
+
+        Same-topic chunks stay ahead of merely allowed neighbours so a teslim
+        question is not answered from a leftover roster snippet.
+        """
+        if not results:
+            return []
+        topic = infer_query_topic(query, mode)
+        if topic is not ChunkCategory.GENERAL:
+            primary = [item for item in results if item.chunk.category is topic]
+            secondary = [item for item in results if item.chunk.category is not topic]
+            results = primary + secondary or results
+        floor = self.retrieval.min_score * 1.4
+        strong = [item for item in results if item.score >= floor]
+        pool = strong or results[:1]
+        cap = 2 if evidence is EvidenceLevel.HIGH else 3
+        return pool[:cap]
 
     def _evidence_level(self, results: list[ScoredChunk]) -> EvidenceLevel:
         if not results:
@@ -206,13 +233,15 @@ class Assistant:
             )
 
         results = self._retrieve(question, mode, top_k)
+        evidence = self._evidence_level(results)
+        results = self._prune_results(results, evidence, question, mode)
         if mode is AssistantMode.SUBMISSION_CHECKLIST:
-            return self._answer_checklist(question, results, mode)
+            return self._answer_checklist(question, results, mode, evidence)
         if mode is AssistantMode.CORRECTION_ANALYZER:
-            return self._answer_correction(question, results, mode)
-        return self._answer_qa(question, results, mode)
+            return self._answer_correction(question, results, mode, evidence)
+        return self._answer_qa(question, results, mode, evidence)
 
-    def _answer_qa(self, question, results, mode) -> Answer:
+    def _answer_qa(self, question, results, mode, evidence: EvidenceLevel) -> Answer:
         if not results:
             return Answer(
                 text=NO_EVIDENCE_ANSWER,
@@ -224,17 +253,19 @@ class Assistant:
             SYSTEM_PROMPTS[mode], build_user_prompt(question, results, mode)
         )
         text = self._strip_invalid_markers(raw, len(results))
+        if evidence is EvidenceLevel.LOW and "kaynaklarda net değil" not in text.lower():
+            text = "Bu konu kaynaklarda net değil.\n\n" + text
         return Answer(
             text=text,
             mode=mode,
-            evidence=self._evidence_level(results),
+            evidence=evidence,
             citations=self._citations(results),
             retrieved=results,
             generator=generator,
             grounded=bool(re.search(r"\[\d+\]", text)) or not self.llm.generative,
         )
 
-    def _answer_checklist(self, status_text, results, mode) -> Answer:
+    def _answer_checklist(self, status_text, results, mode, evidence: EvidenceLevel) -> Answer:
         checklist = analyze_submission(status_text)
         body = checklist.as_text()
         generator = "kural tabanlı"
@@ -253,17 +284,20 @@ class Assistant:
                 "yukarıdaki kontrol listesi program kurallarından türetilmiş varsayılan kurallara dayanıyor._"
             )
 
+        if evidence is EvidenceLevel.LOW and "kaynaklarda net değil" not in body.lower():
+            body = f"{body}\n\n_Bu konu kaynaklarda net değil; kontrol listesi kurallardan, notlar ise en yakın eşleşmelerden üretildi._"
+
         return Answer(
             text=body,
             mode=mode,
-            evidence=self._evidence_level(results) if results else EvidenceLevel.LOW,
+            evidence=evidence if results else EvidenceLevel.LOW,
             citations=self._citations(results),
             retrieved=results,
             structured=checklist.as_dict(),
             generator=generator,
         )
 
-    def _answer_correction(self, message, results, mode) -> Answer:
+    def _answer_correction(self, message, results, mode, evidence: EvidenceLevel) -> Answer:
         analysis = analyze_correction_request(message)
         structured = analysis.as_dict()
         generator = "kural tabanlı"
@@ -277,6 +311,9 @@ class Assistant:
             )
             summary = self._strip_invalid_markers(raw, len(results))
 
+        if evidence is EvidenceLevel.LOW and "kaynaklarda net değil" not in summary.lower():
+            summary = "Kaynaklarda bu düzeltme kuralı net değil. " + summary
+
         body = (
             f"{summary}\n\n"
             "**Yapılandırılmış çıktı**\n```json\n"
@@ -287,7 +324,7 @@ class Assistant:
         return Answer(
             text=body,
             mode=mode,
-            evidence=self._evidence_level(results) if results else EvidenceLevel.LOW,
+            evidence=evidence if results else EvidenceLevel.LOW,
             citations=self._citations(results),
             retrieved=results,
             structured=structured,

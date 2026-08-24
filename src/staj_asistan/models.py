@@ -42,6 +42,17 @@ class EvidenceLevel(str, Enum):
     NONE = "none"
 
 
+class ChunkCategory(str, Enum):
+    """Topical label used to keep retrieval inside the question's lane."""
+
+    ROSTER = "roster"
+    CORRECTION = "correction"
+    SUBMISSION = "submission"
+    TECHNICAL = "technical"
+    PROJECT = "project"
+    GENERAL = "general"
+
+
 @dataclass(frozen=True)
 class Message:
     """A single chat/document message after parsing and privacy masking."""
@@ -76,6 +87,7 @@ class Chunk:
     end_time: datetime | None = None
     message_count: int = 1
     instructor_ratio: float = 0.0
+    category: ChunkCategory = ChunkCategory.GENERAL
 
     @property
     def is_instructor(self) -> bool:

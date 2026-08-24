@@ -17,7 +17,8 @@ from typing import Protocol, runtime_checkable
 
 import numpy as np
 
-from .models import AuthorRole, Chunk
+from .models import AuthorRole, Chunk, ChunkCategory
+from .topics import classify_chunk
 
 
 @runtime_checkable
@@ -38,6 +39,7 @@ class VectorStore(Protocol):
 def _chunk_to_dict(chunk: Chunk) -> dict:
     data = asdict(chunk)
     data["role"] = chunk.role.value
+    data["category"] = chunk.category.value
     data["senders"] = list(chunk.senders)
     data["start_time"] = chunk.start_time.isoformat() if chunk.start_time else None
     data["end_time"] = chunk.end_time.isoformat() if chunk.end_time else None
@@ -45,16 +47,24 @@ def _chunk_to_dict(chunk: Chunk) -> dict:
 
 
 def _chunk_from_dict(data: dict) -> Chunk:
+    text = data["text"]
+    source = data["source"]
+    raw_category = data.get("category")
+    if raw_category:
+        category = ChunkCategory(raw_category)
+    else:
+        category = classify_chunk(text, source)
     return Chunk(
         chunk_id=data["chunk_id"],
-        text=data["text"],
-        source=data["source"],
+        text=text,
+        source=source,
         role=AuthorRole(data["role"]),
         senders=tuple(data.get("senders", ())),
         start_time=datetime.fromisoformat(data["start_time"]) if data.get("start_time") else None,
         end_time=datetime.fromisoformat(data["end_time"]) if data.get("end_time") else None,
         message_count=data.get("message_count", 1),
         instructor_ratio=data.get("instructor_ratio", 0.0),
+        category=category,
     )
 
 
@@ -174,6 +184,7 @@ class ChromaVectorStore:
                     "end_time": c.end_time.isoformat() if c.end_time else "",
                     "message_count": c.message_count,
                     "instructor_ratio": c.instructor_ratio,
+                    "category": c.category.value,
                 }
                 for c in chunks
             ],
@@ -191,6 +202,7 @@ class ChromaVectorStore:
                 "end_time": metadata.get("end_time") or None,
                 "message_count": metadata.get("message_count", 1),
                 "instructor_ratio": metadata.get("instructor_ratio", 0.0),
+                "category": metadata.get("category"),
             }
         )
 

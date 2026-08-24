@@ -20,6 +20,8 @@ import os
 import re
 from abc import ABC, abstractmethod
 
+from .retriever import content_tokens
+
 DEFAULT_ENDPOINT = "http://localhost:5273/v1"
 DEFAULT_MODEL = "phi-4-mini"
 
@@ -129,44 +131,122 @@ class ExtractiveClient(LLMClient):
     """Deterministic, quote-only generator used when no local model is available.
 
     It cannot invent anything: the output is assembled exclusively from sentences
-    that already exist in the retrieved sources. Lower fluency, zero hallucination.
+    that already exist in the retrieved sources. The layout is a short answer,
+    an action list, quoted evidence and source markers — not a raw quote dump.
     """
 
     name = "extractive"
     generative = False
 
     _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+|\n")
+    _HEADER_RE = re.compile(
+        r"^\[\d{1,2}\.\d{1,2}\.\d{4}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?\]\s*[^:\n]+:\s*"
+    )
+    _ACTION_RE = re.compile(
+        r"\b(edin|atın|gönderin|kontrol edin|yükleyin|koyun|çalıştırın|"
+        r"emin olun|bekleyin|ekleyin|yazın|seçin|devam edin)\b",
+        re.IGNORECASE,
+    )
+    _WEAK_QUERY_STEMS = frozenset({"gerek", "olmal", "lazım", "nedir", "nasil", "nasıl"})
 
     def complete(self, system_prompt: str, user_prompt: str, max_tokens: int = 700) -> str:
         question, sources = _split_prompt(user_prompt)
-        keywords = {w for w in re.findall(r"\w{4,}", question.lower())}
-        picked: list[str] = []
+        question_stems = {
+            stem for stem in content_tokens(question) if stem not in self._WEAK_QUERY_STEMS
+        }
+        ranked: list[tuple[int, str, int]] = []
         for index, body in sources:
-            best = self._best_sentence(body, keywords)
-            if best:
-                picked.append(f"- {best} [{index}]")
-            if len(picked) >= 4:
-                break
-        if not picked:
+            for sentence, score in self._scored_sentences(body, question_stems):
+                ranked.append((score, sentence, index))
+        ranked.sort(key=lambda item: -item[0])
+
+        if not ranked:
             return (
-                "Kaynaklarda bu soruya doğrudan karşılık gelen bir cümle bulamadım. "
-                "Aşağıdaki kaynak parçalarını kendin inceleyebilirsin."
+                "Kısa cevap:\n"
+                "Kaynaklarda bu soruya doğrudan karşılık gelen bir cümle bulamadım.\n\n"
+                "Ne yapmalısın:\n"
+                "- Aşağıdaki kaynak parçalarını kendin inceleyebilirsin.\n\n"
+                "Kaynaklara göre kanıt:\n"
+                "- Kaynaklarda doğrudan alıntılanacak bir cümle yok.\n\n"
+                "Kaynaklar:\n"
+                + (", ".join(f"[{index}]" for index, _ in sources) if sources else "—")
             )
+
+        seen: set[str] = set()
+        unique: list[tuple[int, str, int]] = []
+        for score, sentence, index in ranked:
+            key = sentence.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append((score, sentence, index))
+
+        short_sentence, short_index = unique[0][1], unique[0][2]
+        actions: list[tuple[str, int]] = [(short_sentence, short_index)]
+        for _, sentence, index in unique[1:]:
+            if not self._ACTION_RE.search(sentence):
+                continue
+            if any(sentence == existing for existing, _ in actions):
+                continue
+            actions.append((sentence, index))
+            if len(actions) >= 3:
+                break
+
+        evidence = unique[:3]
+        used = sorted({short_index, *(index for _, index in actions), *(item[2] for item in evidence)})
+
+        action_lines = "\n".join(f"- {sentence} [{index}]" for sentence, index in actions)
+        evidence_lines = "\n".join(f"- {sentence} [{index}]" for _, sentence, index in evidence)
+        markers = ", ".join(f"[{index}]" for index in used)
         return (
-            "Yerel dil modeli çalışmadığı için kaynaklardan doğrudan alıntı yapıyorum "
-            "(bu modda hiçbir cümle üretilmez):\n\n" + "\n".join(picked)
+            f"Kısa cevap:\n{short_sentence} [{short_index}]\n\n"
+            f"Ne yapmalısın:\n{action_lines}\n\n"
+            f"Kaynaklara göre kanıt:\n{evidence_lines}\n\n"
+            f"Kaynaklar:\n{markers}"
         )
 
-    def _best_sentence(self, text: str, keywords: set[str]) -> str | None:
-        best_sentence, best_score = None, 0
-        for sentence in self._SENTENCE_RE.split(text):
-            sentence = sentence.strip()
-            if len(sentence) < 25:
+    def _scored_sentences(
+        self, text: str, question_stems: set[str]
+    ) -> list[tuple[str, int]]:
+        scored: list[tuple[str, int]] = []
+        for raw in self._SENTENCE_RE.split(text):
+            original = raw.strip()
+            sentence = self._clean_sentence(original)
+            if original.startswith("#") or not self._usable(sentence):
                 continue
-            score = sum(1 for word in keywords if word in sentence.lower())
-            if score > best_score:
-                best_sentence, best_score = sentence, score
-        return best_sentence
+            sent_stems = set(content_tokens(sentence))
+            score = len(question_stems & sent_stems)
+            if "eğitmen:" in original.lower():
+                score += 2
+            if self._ACTION_RE.search(sentence):
+                score += 2
+            if sentence.endswith("?"):
+                score -= 2
+            if question_stems and sent_stems:
+                overlap = len(question_stems & sent_stems) / len(question_stems | sent_stems)
+                if overlap >= 0.65:
+                    score -= 3
+            if score <= 0:
+                continue
+            scored.append((sentence, score))
+        return scored
+
+    def _clean_sentence(self, sentence: str) -> str:
+        sentence = sentence.strip().lstrip("-*• ").strip()
+        sentence = re.sub(r"^#+\s+", "", sentence)
+        sentence = self._HEADER_RE.sub("", sentence)
+        return re.sub(r"\s+", " ", sentence).strip()
+
+    @staticmethod
+    def _usable(sentence: str) -> bool:
+        if len(sentence) < 25:
+            return False
+        if sentence.startswith("#"):
+            return False
+        lowered = sentence.lower()
+        if lowered.startswith("bu dosya") or lowered.startswith("örnek "):
+            return False
+        return True
 
     @property
     def description(self) -> str:

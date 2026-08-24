@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from .models import AuthorRole, Chunk, Message
+from .topics import classify_chunk
 
 
 @dataclass(frozen=True)
@@ -108,9 +109,10 @@ def _make_chunk(
     for message in messages:
         if message.sender and message.sender not in senders:
             senders.append(message.sender)
+    body = text.strip()
     return Chunk(
         chunk_id=chunk_id,
-        text=text.strip(),
+        text=body,
         source=source,
         role=role or computed_role,
         senders=tuple(senders),
@@ -118,6 +120,7 @@ def _make_chunk(
         end_time=max(timestamps) if timestamps else None,
         message_count=len(messages),
         instructor_ratio=computed_ratio if instructor_ratio is None else instructor_ratio,
+        category=classify_chunk(body, source),
     )
 
 
@@ -197,13 +200,15 @@ def chunk_document(
     ):
         if len(part.strip()) < config.min_chunk_chars:
             continue
+        body = part.strip()
         chunks.append(
             Chunk(
                 chunk_id=f"{source}#{index:04d}",
-                text=part.strip(),
+                text=body,
                 source=source,
                 role=AuthorRole.DOCUMENT,
                 message_count=1,
+                category=classify_chunk(body, source),
             )
         )
     return chunks
