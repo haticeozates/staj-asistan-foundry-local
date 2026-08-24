@@ -280,6 +280,12 @@ Walkthrough with expected behaviour: [`docs/demo_script.md`](docs/demo_script.md
 
 ## Screenshots
 
+![StajAsistan UI](screenshots/uygulama.png)
+
+This capture is the app answering *Final tesliminde ne gerekiyor?* after **Örnek veri** was loaded.
+It uses only the anonymised files in `data/samples/`; no real WhatsApp export, name, e-mail or
+local path is visible.
+
 `screenshots/` is the only directory in this repository that may contain images, and only under
 one condition: the capture must show this application running on the anonymised sample data.
 
