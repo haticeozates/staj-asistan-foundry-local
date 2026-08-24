@@ -53,6 +53,19 @@ class TestListeQueryStaysOnRoster:
 
 
 class TestSubmissionAndTechnicalRouting:
+    def test_final_teslim_canonical_rules_not_anecdote(self):
+        answer = _extractive_assistant().ask("Final tesliminde ne gerekiyor?")
+        text = answer.text.lower()
+        short = text.split("ne yapmalısın:")[0] if "ne yapmalısın:" in text else text
+        assert "github" in short or "kaynak kod" in short or "source" in short
+        assert "video" in short
+        assert "e-posta" in short or "e-mail" in short or "eposta" in short
+        assert "çekmedim" not in short
+        assert "repom hazır" not in short
+        assert answer.mode is AssistantMode.SUBMISSION_CHECKLIST
+        assert "kaynak kod" in text or "github" in text
+        assert "whatsapp" in text or "e-posta" in text
+
     def test_final_teslim_prefers_submission_evidence(self):
         answer = _extractive_assistant().ask("Final tesliminde ne gerekiyor?")
         assert any(s.chunk.category is ChunkCategory.SUBMISSION for s in answer.retrieved)

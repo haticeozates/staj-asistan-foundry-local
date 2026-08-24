@@ -3,6 +3,10 @@
 Bu dosya, program duyurularından derlenmiş teslim kurallarının düz metin özetidir.
 Gerçek katılımcı verisi içermez; sadece kuralları ve tipik durumları anlatır.
 
+## Teslim kural kartı
+
+Final teslimi için GitHub/source code linki, kısa “ne yaptım-ne öğrendim” videosu ve bu linklerin e-posta ile gönderilmesi gerekir. Video yoksa teslim eksik sayılır. WhatsApp mesajı tek başına teslim yerine geçmez.
+
 ## Zorunlu teslim kalemleri
 
 1. Kaynak kod linki

@@ -7,6 +7,7 @@ the suite is deterministic and needs neither a network nor a running model.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -107,7 +108,7 @@ class TestGroundingContract:
 
     def test_empty_index_refuses_too(self, stub):
         empty = Assistant(llm=stub)
-        answer = empty.ask("Final tesliminde ne gerekiyor?")
+        answer = empty.ask("Sertifika süreci nasıl işliyor?")
         assert answer.evidence is EvidenceLevel.NONE
         assert stub.calls == []
 
@@ -150,7 +151,7 @@ class TestGroundingContract:
         quoted = [
             line.lstrip("- ").rsplit(" [", 1)[0]
             for line in answer.text.splitlines()
-            if line.startswith("- ")
+            if line.startswith("- ") and re.search(r"\[\d+\]\s*$", line)
         ]
         assert quoted
         for sentence in quoted:

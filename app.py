@@ -38,7 +38,7 @@ EVIDENCE_BADGES: dict[EvidenceLevel, tuple[str, str]] = {
 }
 
 DEMO_QUESTIONS: list[tuple[str, AssistantMode]] = [
-    ("Final tesliminde ne gerekiyor?", AssistantMode.INSTRUCTOR_QA),
+    ("Final tesliminde ne gerekiyor?", AssistantMode.SUBMISSION_CHECKLIST),
     ("Liste güncel değilse çalışmaya devam etmeli miyim?", AssistantMode.INSTRUCTOR_QA),
     (
         "GitHub repo hazır ama video çekmedim, teslim için eksiğim var mı?",

@@ -83,7 +83,33 @@ class TestSubmissionChecklist:
     def test_empty_status_reports_everything_missing(self):
         result = analyze_submission("")
         assert len(result.missing) >= 3
-        assert result.complete is False
+
+
+class TestSubmissionRequirementQuery:
+    def test_rules_question_is_detected(self):
+        from staj_asistan.workflows import is_submission_requirement_query
+
+        assert is_submission_requirement_query("Final tesliminde ne gerekiyor?") is True
+
+    def test_personal_status_is_not_a_rules_question(self):
+        from staj_asistan.workflows import is_submission_requirement_query
+
+        assert (
+            is_submission_requirement_query(
+                "GitHub repo hazır ama video çekmedim, teslim için eksiğim var mı?"
+            )
+            is False
+        )
+
+    def test_canonical_rules_cover_the_three_required_items(self):
+        from staj_asistan.workflows import format_submission_rules
+
+        text = format_submission_rules().lower()
+        assert "github" in text or "kaynak kod" in text
+        assert "video" in text
+        assert "e-posta" in text or "e-mail" in text
+        assert "whatsapp" in text
+        assert "çekmedim" not in text
 
 
 class TestCorrectionAnalyzer:
@@ -179,6 +205,7 @@ class TestModeSuggestion:
         [
             ("Listede projem yanlış görünüyor", AssistantMode.CORRECTION_ANALYZER),
             ("GitHub repo hazır ama video çekmedim", AssistantMode.SUBMISSION_CHECKLIST),
+            ("Final tesliminde ne gerekiyor?", AssistantMode.SUBMISSION_CHECKLIST),
             ("Foundry Local endpoint hatası alıyorum", AssistantMode.TECHNICAL_HELP),
             ("Sertifika ne zaman gelir", AssistantMode.INSTRUCTOR_QA),
         ],

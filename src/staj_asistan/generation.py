@@ -148,6 +148,11 @@ class ExtractiveClient(LLMClient):
         re.IGNORECASE,
     )
     _WEAK_QUERY_STEMS = frozenset({"gerek", "olmal", "lazım", "nedir", "nasil", "nasıl"})
+    _ANECDOTE_RE = re.compile(
+        r'^["“]|→|çekmedim|yapmadım|atmadım|repom hazır|durdurayım',
+        re.IGNORECASE,
+    )
+    _COVERAGE_TERMS = ("github", "source", "kaynak kod", "video", "e-posta", "e-mail", "whatsapp")
 
     def complete(self, system_prompt: str, user_prompt: str, max_tokens: int = 700) -> str:
         question, sources = _split_prompt(user_prompt)
@@ -214,8 +219,16 @@ class ExtractiveClient(LLMClient):
             sentence = self._clean_sentence(original)
             if original.startswith("#") or not self._usable(sentence):
                 continue
+            if self._ANECDOTE_RE.search(sentence):
+                continue
             sent_stems = set(content_tokens(sentence))
             score = len(question_stems & sent_stems)
+            lowered = sentence.lower()
+            coverage = sum(1 for term in self._COVERAGE_TERMS if term in lowered)
+            if coverage >= 3:
+                score += 3
+            elif coverage >= 2:
+                score += 1
             if "eğitmen:" in original.lower():
                 score += 2
             if self._ACTION_RE.search(sentence):

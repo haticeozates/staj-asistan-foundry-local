@@ -175,6 +175,52 @@ def analyze_submission(status_text: str) -> ChecklistResult:
     return result
 
 
+_REQUIREMENT_QUERY_HINTS = (
+    "ne gerekiyor",
+    "neler gerekiyor",
+    "ne gerekli",
+    "neler gerekli",
+    "ne lazım",
+    "zorunlu teslim",
+    "tesliminde",
+    "final teslim",
+)
+_STATUS_QUERY_HINTS = (
+    "çekmedim",
+    "eksiğim",
+    "hazır mıyım",
+    "repo hazır",
+    "attım",
+    "gönderdim",
+    "teslim durumu",
+)
+
+SUBMISSION_RULE_LINES: tuple[str, ...] = (
+    "GitHub / kaynak kod linki gerekir (public bir link de kabul edilir).",
+    "Kısa demo videosu gerekir: ne yaptım, ne öğrendim (yaklaşık 2 dakika).",
+    "Kod ve video linkleri e-posta ile gönderilmelidir.",
+    "Video yoksa teslim eksik sayılır.",
+    "WhatsApp mesajı tek başına teslim yerine geçmez.",
+)
+
+
+def is_submission_requirement_query(text: str) -> bool:
+    """True when the user asks what the submission rules are, not about their own status."""
+    lowered = _lower(text)
+    if any(hint in lowered for hint in _STATUS_QUERY_HINTS):
+        return False
+    if "teslim" not in lowered and "final teslim" not in lowered:
+        return False
+    return any(hint in lowered for hint in _REQUIREMENT_QUERY_HINTS)
+
+
+def format_submission_rules() -> str:
+    """Canonical submission-requirement card used for 'what do I need to submit?' questions."""
+    lines = ["**Final teslim için gerekenler**"]
+    lines.extend(f"- {line}" for line in SUBMISSION_RULE_LINES)
+    return "\n".join(lines)
+
+
 # --------------------------------------------------------------------------------------
 # Correction request analyzer
 # --------------------------------------------------------------------------------------
@@ -375,7 +421,16 @@ _MODE_HINTS: tuple[tuple[AssistantMode, tuple[str, ...]], ...] = (
     ),
     (
         AssistantMode.SUBMISSION_CHECKLIST,
-        ("eksiğim", "teslim için", "hazır mıyım", "çekmedim", "repo hazır", "teslim durumu"),
+        (
+            "eksiğim",
+            "teslim için",
+            "hazır mıyım",
+            "çekmedim",
+            "repo hazır",
+            "teslim durumu",
+            "tesliminde",
+            "final teslim",
+        ),
     ),
     (
         AssistantMode.TECHNICAL_HELP,
