@@ -494,3 +494,21 @@ def suggest_mode(text: str) -> AssistantMode:
         if any(keyword in lowered for keyword in keywords):
             return mode
     return AssistantMode.INSTRUCTOR_QA
+
+
+def resolve_mode(
+    text: str, requested: AssistantMode = AssistantMode.INSTRUCTOR_QA
+) -> AssistantMode:
+    """Decide which workflow a question should actually run through.
+
+    An explicit mode choice always wins — if somebody opened Technical Help on
+    purpose, second-guessing them is worse than answering the question they asked.
+    Instructor Q&A is the default rather than a choice, so a confident intent may
+    override it: telling a user their message belongs in another mode and then
+    answering it badly anyway helps nobody.
+    """
+    if requested is not AssistantMode.INSTRUCTOR_QA:
+        return requested
+    if is_submission_requirement_query(text) or is_submission_channel_query(text):
+        return AssistantMode.SUBMISSION_CHECKLIST
+    return suggest_mode(text)

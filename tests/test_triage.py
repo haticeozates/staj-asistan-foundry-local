@@ -128,6 +128,20 @@ class TestReplyPolicy:
         assert result.reply_decision is ReplyDecision.NEEDS_HUMAN_APPROVAL
         assert result.draft_reply.strip()
 
+    def test_correction_message_matches_the_assistant_view_verdict(self, assistant):
+        # Same message, two entry points: the simulator escalates it and the plain
+        # assistant view answers it through the same correction workflow.
+        result = triage(_message(CORRECTION), assistant)
+        assert result.reply_decision is ReplyDecision.NEEDS_HUMAN_APPROVAL
+        assert result.selected_mode is assistant.ask(CORRECTION).mode
+
+    def test_off_topic_message_is_refused_with_nothing_attached(self, assistant):
+        result = triage(_message(OFF_TOPIC), assistant)
+        assert result.reply_decision is ReplyDecision.DO_NOT_ANSWER
+        assert result.draft_reply == ""
+        assert result.source_categories == ()
+        assert result.answer.citations == []
+
     def test_every_result_reports_source_categories(self, assistant):
         result = triage(_message(SUBMISSION_STATUS), assistant)
         assert result.source_categories
@@ -233,3 +247,10 @@ class TestSimulatorView:
         rendered = self._analyse(app, OFF_TOPIC)
         assert not rendered.exception
         assert rendered.code == []
+
+    def test_assistant_view_announces_the_workflow_it_routed_to(self, app):
+        app.sidebar.radio[0].set_value("Asistan").run()
+        app.text_area(key="question_text").set_value(CORRECTION)
+        rendered = next(b for b in app.button if b.label == "Sor").click().run()
+        assert not rendered.exception
+        assert any("Düzeltme İsteği Analizi** kapsamında" in i.value for i in rendered.info)

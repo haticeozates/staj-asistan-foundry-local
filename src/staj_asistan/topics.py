@@ -191,6 +191,69 @@ _TECHNICAL_QUERY_HINTS = (
 )
 
 
+#: Vocabulary that marks a question as belonging to this programme at all. It exists
+#: to stop a coincidental word match from passing as evidence: "İstanbul'da hava
+#: nasıl?" can still overlap an indexed chunk lexically, and without this gate the
+#: deterministic workflows will happily build a submission checklist out of it.
+_PROGRAMME_TOPIC_HINTS = (
+    "staj",
+    "program",
+    "eğitmen",
+    "egitmen",
+    "sertifika",
+    "certificate",
+    "proje",
+    "video",
+    "github",
+    "repo",
+    "kaynak kod",
+    "source code",
+    "foundry",
+    "local rag",
+    "rag",
+    "model",
+    "python",
+    "duyuru",
+    "grup",
+    "mentor",
+    "e-posta",
+    "eposta",
+    "e-mail",
+    "whatsapp",
+    # Status phrasing the checklist workflow is built to read. "Her şey hazır" names
+    # no programme noun but is unmistakably about a submission.
+    "hazır",
+    "hazir",
+    "bitirdim",
+    "tamamladım",
+    "tamamladim",
+    "çekmedim",
+    "cekmedim",
+    "yükledim",
+    "yukledim",
+    "gönderdim",
+    "gonderdim",
+    "eksik",
+)
+
+
+def is_programme_topic(text: str) -> bool:
+    """True when the question is about this programme in any recognisable way.
+
+    Deliberately generous: this is a floor, not a router. Anything it lets through
+    is still judged on retrieval evidence, so a false positive costs nothing while
+    a false negative would silence a legitimate question.
+    """
+    lowered = _fold(text)
+    return (
+        _has_any(lowered, _PROGRAMME_TOPIC_HINTS)
+        or _has_any(lowered, _ROSTER_QUERY_HINTS)
+        or _has_any(lowered, _CORRECTION_QUERY_HINTS)
+        or _has_any(lowered, _SUBMISSION_QUERY_HINTS)
+        or _has_any(lowered, _TECHNICAL_QUERY_HINTS)
+    )
+
+
 def infer_query_topic(query: str, mode: AssistantMode) -> ChunkCategory:
     """Map a question (and the active mode) onto the same category vocabulary.
 

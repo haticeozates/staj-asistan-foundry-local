@@ -53,14 +53,13 @@ Kaynaklarda karşılığı olmayan teknik bir konu sorulursa, bunu açıkça sö
 {GROUNDING_RULES}""",
 }
 
+#: Kept deliberately short and source-free. A refusal that still shows a snippet or a
+#: "kısa cevap" block reads as a half-answer, which is exactly what it must not be.
 NO_EVIDENCE_ANSWER = (
-    "Bu konu elimdeki kaynaklarda net değil.\n\n"
-    "Yüklediğim duyuru ve mesajlarda bu soruyu güvenle yanıtlayacak bir bilgi bulamadım. "
-    "Uydurma bilgi vermemek için cevap üretmiyorum.\n\n"
-    "Yapabileceklerin:\n"
-    "- Soruyu programa özgü kelimelerle yeniden yaz (ör. \"sertifika\", \"teslim\", \"video\", \"GitHub linki\").\n"
-    "- İlgili duyuruların bulunduğu grup dışa aktarımını da yükle.\n"
-    "- Yine de net değilse eğitmene doğrudan e-posta gönder."
+    "Bu soru yüklü kaynaklarda yer almıyor.\n\n"
+    "Staj programı, teslim, liste düzeltme veya teknik kurulumla ilgili bir soru "
+    "sorabilirsiniz.\n\n"
+    "_Konu kaynaklarda net değil; uydurma bilgi vermemek için cevap üretmiyorum._"
 )
 
 

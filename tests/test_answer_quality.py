@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from staj_asistan.generation import ExtractiveClient
 from staj_asistan.models import AssistantMode, ChunkCategory, EvidenceLevel
 from staj_asistan.pipeline import Assistant
@@ -125,6 +127,101 @@ class TestGithubContentsAndWhatsappChannel:
             blob = _blob(answer)
             for marker in AZURE_DRIFT_MARKERS:
                 assert marker not in blob, f"{question!r} drifted to {marker!r}"
+
+
+CORRECTION_QUERY = (
+    "Listede projem yanlış görünüyor, Foundry Local olarak güncellenmesini istiyorum."
+)
+OUT_OF_SCOPE_QUERY = "İstanbul'da hava nasıl?"
+
+
+class TestDefaultViewRoutesToTheRightWorkflow:
+    """The assistant view used to only *hint* at a better mode and then answer badly
+    in Instructor Q&A anyway. A hint the user has to act on is not routing."""
+
+    def test_correction_message_is_answered_by_the_correction_workflow(self):
+        answer = _extractive_assistant().ask(CORRECTION_QUERY)
+        assert answer.mode is AssistantMode.CORRECTION_ANALYZER
+        assert answer.structured["intent"] == "list_correction"
+
+    def test_correction_answer_states_it_cannot_be_applied_automatically(self):
+        text = _extractive_assistant().ask(CORRECTION_QUERY).text.lower()
+        assert "düzeltme isteği" in text
+        assert "otomatik" in text
+        assert "eğitmen" in text or "onay" in text
+        assert "e-posta" in text
+
+    def test_correction_answer_reports_the_missing_identity_fields(self):
+        answer = _extractive_assistant().ask(CORRECTION_QUERY)
+        assert set(answer.structured["missing_required_info"]) >= {"full_name", "email"}
+        assert answer.structured["auto_apply"] is False
+
+    def test_correction_answer_does_not_quote_a_participant_as_the_rule(self):
+        blob = _blob(_extractive_assistant().ask(CORRECTION_QUERY))
+        assert "github linkleri sizi yanıltmasın" not in blob
+        assert "videoları seyrettikten sonra ekleyeceğim" not in blob
+
+    @pytest.mark.parametrize(
+        "question,expected",
+        [
+            (CORRECTION_QUERY, AssistantMode.CORRECTION_ANALYZER),
+            (CHECKLIST_QUERY, AssistantMode.SUBMISSION_CHECKLIST),
+            ("Foundry Local kurulumu hata veriyor", AssistantMode.TECHNICAL_HELP),
+        ],
+    )
+    def test_high_confidence_intents_pick_their_workflow(self, question, expected):
+        assert _extractive_assistant().ask(question).mode is expected
+
+    def test_an_explicit_mode_choice_is_never_overridden(self):
+        answer = _extractive_assistant().ask(
+            CORRECTION_QUERY, mode=AssistantMode.TECHNICAL_HELP
+        )
+        assert answer.mode is AssistantMode.TECHNICAL_HELP
+
+
+class TestOutOfScopeRefusal:
+    """An out-of-scope question must refuse cleanly — no snippet, no citation, no
+    workflow card built out of thin air."""
+
+    @pytest.mark.parametrize("mode", list(AssistantMode))
+    def test_off_topic_question_is_refused_in_every_mode(self, mode):
+        answer = _extractive_assistant().ask(OUT_OF_SCOPE_QUERY, mode=mode)
+        assert answer.evidence is EvidenceLevel.NONE
+
+    @pytest.mark.parametrize("mode", list(AssistantMode))
+    def test_refusal_shows_no_sources_at_all(self, mode):
+        answer = _extractive_assistant().ask(OUT_OF_SCOPE_QUERY, mode=mode)
+        assert answer.citations == []
+        assert answer.retrieved == []
+        assert not answer.structured
+
+    def test_refusal_names_the_topics_the_assistant_does_cover(self):
+        text = _extractive_assistant().ask(OUT_OF_SCOPE_QUERY).text
+        assert "yüklü kaynaklarda yer almıyor" in text
+        assert "teslim" in text.lower()
+
+    @pytest.mark.parametrize("mode", list(AssistantMode))
+    def test_refusal_carries_no_answer_scaffolding(self, mode):
+        text = _extractive_assistant().ask(OUT_OF_SCOPE_QUERY, mode=mode).text.lower()
+        for scaffold in ("kısa cevap:", "ne yapmalısın:", "kaynaklara göre", "eksikler", "[1]"):
+            assert scaffold not in text, f"refusal leaked {scaffold!r}"
+
+    @pytest.mark.parametrize(
+        "question",
+        [
+            "İstanbul'da hava nasıl?",
+            "Ankara'da ofis var mı?",
+            "Bana kariyer tavsiyesi verir misin?",
+            "Hangi şehirde yaşamalıyım?",
+        ],
+    )
+    def test_city_weather_and_personal_advice_are_out_of_scope(self, question):
+        assert _extractive_assistant().ask(question).evidence is EvidenceLevel.NONE
+
+    def test_in_scope_questions_still_answer(self):
+        assistant = _extractive_assistant()
+        for question in ("Final tesliminde ne gerekiyor?", CHECKLIST_QUERY, LISTE_QUERY):
+            assert assistant.ask(question).evidence is not EvidenceLevel.NONE
 
 
 class TestExtractiveFormatAndCitations:

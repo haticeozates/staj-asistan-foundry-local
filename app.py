@@ -21,7 +21,6 @@ from staj_asistan.triage import (  # noqa: E402
     ReplyDecision,
     triage,
 )
-from staj_asistan.workflows import suggest_mode  # noqa: E402
 
 # The simulator is a view, not a fifth AssistantMode: it picks one of the four
 # existing modes for you rather than adding a new answering style.
@@ -321,19 +320,20 @@ def render_assistant_view(assistant: Assistant, mode: AssistantMode) -> None:
 
     if submitted:
         if question.strip():
-            hinted = suggest_mode(question)
-            if hinted is not mode:
-                st.caption(
-                    f"İpucu: bu girdi **{MODE_LABELS[hinted]}** moduna daha uygun olabilir."
-                )
             with st.spinner("Kaynaklar taranıyor…"):
                 st.session_state["answer"] = assistant.ask(question, mode=mode)
+            st.session_state["asked_mode"] = mode
         else:
             st.warning("Önce bir soru veya durum yaz.")
 
     # Rendered outside the click branch so the answer survives later reruns.
-    if st.session_state.get("answer") is not None:
-        render_answer(st.session_state["answer"])
+    answer = st.session_state.get("answer")
+    if answer is not None:
+        if answer.mode is not st.session_state.get("asked_mode"):
+            # The pipeline re-routes a confident intent instead of merely hinting at
+            # it, so say which workflow actually ran rather than leaving it to guess.
+            st.info(f"Bu soru **{MODE_LABELS[answer.mode]}** kapsamında değerlendirildi.")
+        render_answer(answer)
 
 
 def main() -> None:

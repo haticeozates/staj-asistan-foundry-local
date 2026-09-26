@@ -13,11 +13,20 @@ export STAJ_ASISTAN_EMBEDDING_BACKEND=sentence-transformers
 streamlit run app.py
 ```
 
-Then press **Örnek veri** in the sidebar. Check that the sidebar shows the embedding backend and
-the Foundry Local model — the audience should see that both are local before any answer appears.
+Then press **Temizle**, and only after that **Örnek veri**. Do this even on a fresh start, and do
+it before you hit record.
+
+This order is not fussiness. The index is cumulative: if you tested against a real export earlier
+in the session, its chunks are still in there and will surface as citations mid-demo. **Temizle**
+empties the store, **Örnek veri** reloads only `data/samples/`, and the sidebar counters let you
+confirm it — three files, and a chunk count that matches sample data rather than a real corpus.
+
+Check that the sidebar shows the embedding backend and the Foundry Local model — the audience
+should see that both are local before any answer appears.
 
 Demo on the anonymised sample data. The real corpus is where the system was validated, but its
-snippets are other people's messages and do not belong on a projector.
+snippets are other people's messages and do not belong on a projector, in a recording, or in a
+screenshot. Real exports are for local, private testing only.
 
 If Foundry Local is not running, everything still works: answers switch to quotation mode and are
 labelled as such. That is worth showing on purpose if you have a spare thirty seconds.
@@ -36,7 +45,7 @@ retrieved. This is the difference between an answer and a claim.
 
 ## 2. "Liste güncel değilse çalışmaya devam etmeli miyim?" — authority weighting
 
-*Instructor Q&A mode.*
+*Instructor Q&A mode*, and this one genuinely stays there.
 
 Expect: keep working, the roster updates with a delay.
 
@@ -61,9 +70,13 @@ so it produces the same answer every time; the model may only rephrase it.
 
 ## 4. "Listede projem yanlış görünüyor, Foundry Local olarak güncellenmesini istiyorum. Bu mesaj yeterli mi?" — correction analyzer
 
-*Correction Request Analyzer mode.*
+*Correction Request Analyzer mode* — and you can leave the sidebar on Instructor Q&A to prove it.
+The banner above the answer will read *"Bu soru Düzeltme İsteği Analizi kapsamında değerlendirildi"*.
+The assistant routes the message rather than suggesting you re-ask it somewhere else.
 
-Expect structured JSON:
+Expect a header stating the three things a participant actually needs to hear — this is a
+correction request, the assistant cannot apply it, only the instructor can — followed by
+structured JSON:
 
 ```json
 {
@@ -85,11 +98,17 @@ a person.
 Say the quiet part explicitly: `auto_apply` is always false. The assistant drafts, a human decides.
 An agent that edits a roster on the strength of a chat message is a liability, not a feature.
 
-## 5. "Yemekhane menüsü nedir?" — refusal
+## 5. "İstanbul'da hava nasıl?" — refusal
 
 Ask something the corpus cannot answer.
 
-Expect: *"Bu konu elimdeki kaynaklarda net değil"*, an explanation, and suggestions for rephrasing.
+Expect two sentences and nothing else: *"Bu soru yüklü kaynaklarda yer almıyor"*, followed by the
+topics it does cover. **Point at what is missing** — no snippet, no citation panel, no "kısa
+cevap" block, no half-filled checklist. A refusal that still shows sources reads as a hedged
+answer, and a hedged answer about programme rules is worse than silence.
+
+Switch the mode to Teslim Kontrol Listesi and ask it again. It refuses identically; the
+deterministic workflows do not get to build a card out of an off-topic question.
 
 The model was never called. Retrieval found nothing above threshold, so generation was skipped
 entirely — the guarantee is structural, not a polite instruction in a prompt. Most demos avoid this
@@ -125,3 +144,4 @@ of service. Neither belongs in a public repository built on other people's messa
 | Every answer starts "Yerel dil modeli çalışmadığı için…" | Foundry Local is not reachable | `foundry service start`, then reload |
 | Answers are oddly off-topic | The `hashing` fallback is active | Set the embedding backend and restart |
 | Sidebar shows 0 chunks | Nothing indexed yet | Press **Örnek veri** |
+| A citation quotes a message you recognise | A real export is still in the index | **Temizle**, then **Örnek veri**, and re-record |

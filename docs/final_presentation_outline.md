@@ -72,8 +72,9 @@ Pick two or three; do not list all of them.
 
 Say these before anyone asks:
 
-- The dependency-free fallback backend refuses out-of-scope questions poorly — 3 of 8 versus 8 of 8
-  for real embeddings. Measured, documented, and the reason a real backend is recommended.
+- The dependency-free fallback backend refuses out-of-scope questions less reliably — 6 of 8
+  versus 8 of 8 for real embeddings. Measured, documented, and the reason a real backend is
+  recommended.
 - No Turkish NER, so a name inside free-form prose can survive masking.
 - Single-turn; no conversation memory.
 - The simulator is a simulation. Messages are pasted in by hand; no group is connected.

@@ -178,6 +178,36 @@ call the model only if there is evidence, attach citations, verify the markers.
 Retrieval parameters are tuned per mode — the checklist mode wants breadth across submission rules,
 the Q&A mode wants precision on a single question.
 
+### Routing, not hinting
+
+Instructor Q&A is the default, not a choice, so a confident intent overrides it: a correction
+request typed into the default view runs through the correction workflow, and the UI states which
+workflow answered. An explicitly selected mode is never overridden — if somebody opened Technical
+Help deliberately, second-guessing them is worse than answering what they asked.
+
+The earlier behaviour was a caption suggesting a better mode while answering in the wrong one.
+That is the worst of both: the user is told the answer is unsuitable and given it anyway.
+
+### The topic floor
+
+Refusal used to depend entirely on the retrieval threshold, which left a hole. The deterministic
+modes build their cards from rules rather than from retrieval, so *"İstanbul'da hava nasıl?"* in
+checklist mode produced a full submission checklist with nothing behind it.
+
+The fix is a mode-independent gate applied before dispatch: if the question shares no programme
+vocabulary *and* the evidence is not high, refuse. Both halves are load-bearing.
+
+The vocabulary check alone is too blunt — measured on sample data, *"Ne zaman başlıyoruz?"*,
+*"İki tane yapsam ne olur?"*, *"Başka bir dil kullanabilir miyim?"* and *"Nereye göndereceğim?"*
+contain no programme noun yet all four retrieve correct instructor answers at high evidence.
+Retrieval must keep the final say when it is confident.
+
+The evidence check alone was the original hole. Together they took the offline backend's
+out-of-scope refusal rate from 3/8 to 6/8 without silencing a single in-scope question.
+
+A refusal returns the refusal text and nothing else: no citations, no retrieved chunks, no
+structured card. A refusal that still renders sources reads as a hedged answer.
+
 ## 11. Triage (`triage.py`)
 
 Everything above assumes a person opened the tool and chose a mode. Triage models the case that

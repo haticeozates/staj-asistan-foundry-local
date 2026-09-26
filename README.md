@@ -147,7 +147,12 @@ measurements behind every threshold.
   will not outrank the instructor's actual answer, even when it matches the question more literally.
   This is verified by a test.
 - **Refusal instead of invention.** If nothing clears the calibrated threshold, the language model
-  is never called; the assistant says the sources do not cover it.
+  is never called; the assistant says the sources do not cover it, and shows nothing else — no
+  snippet, no citation panel, no half-filled workflow card. This holds in every mode, so a
+  deterministic checklist cannot be built out of an off-topic question.
+- **Intent routing, not hinting.** A correction request typed into the default Q&A view is
+  answered by the correction workflow, and the UI says which workflow ran. Picking a mode
+  explicitly always overrides this.
 - **Citations on every answer**, with the retrieved snippet, the authority level, the date, and a
   breakdown of why that chunk was retrieved.
 - **Evidence level** (high / medium / low / none) shown next to each answer.
@@ -282,7 +287,7 @@ staj-asistan stats
 ## Test
 
 ```bash
-pytest                    # 269 passed, 18 skipped, ~2 seconds, fully offline
+pytest                    # 298 passed, 18 skipped, ~2 seconds, fully offline
 ```
 
 Tests that load a real embedding model are opt-in, so the default run stays fast:
@@ -332,12 +337,18 @@ images by pressing **Örnek veri** and running the four demo questions above.
 
 Stated plainly, because knowing where a system is weak is part of shipping it:
 
-- **The offline `hashing` backend has weak semantic refusal.** On an evaluation set of 10 in-scope
-  and 8 out-of-scope questions, the sentence-transformers backend answered 10/10 and refused 8/8.
-  The hashing fallback also answered 10/10 but wrongly accepted 5 of the 8 off-topic questions,
-  because bag-of-words vectors cannot tell that "Mars'a ne zaman insan gönderilecek?" is unrelated
-  when it shares the stems *zaman* and *gönder* with the corpus. Use a real embedding backend for
-  anything beyond tests.
+- **The offline `hashing` backend still has weak semantic refusal.** On an evaluation set of 10
+  in-scope and 8 out-of-scope questions, the sentence-transformers backend answered 10/10 and
+  refused 8/8. The hashing fallback answers 10/10 and now refuses 6/8, up from 3/8 before the
+  topic gate. The two it still accepts — *"Mars'a ne zaman insan gönderilecek?"* and *"En iyi
+  pizza tarifi nedir?"* — reach high evidence because bag-of-words vectors cannot tell they are
+  unrelated when they share stems like *zaman* and *gönder* with the corpus.
+
+  Forcing those to 8/8 would mean refusing anything outside a keyword list even on strong
+  retrieval, and that is measurably worse: *"Ne zaman başlıyoruz?"*, *"İki tane yapsam ne olur?"*
+  and *"Nereye göndereceğim?"* are all answered correctly today and contain no programme noun at
+  all. Strong retrieval stays authoritative; the keyword floor only settles the weak cases. Use a
+  real embedding backend for anything beyond tests.
 - **No Turkish named-entity recognition.** Masking handles structured identifiers (e-mails, phones,
   links, roster tables) reliably, but a name written in the middle of free-form prose can survive.
 - **Stemming is fixed-length truncation**, a strong Turkish baseline but not a real morphological

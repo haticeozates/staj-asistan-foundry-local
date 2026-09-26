@@ -44,7 +44,7 @@ from .prompts import (
     build_user_prompt,
 )
 from .retriever import RetrievalConfig, Retriever
-from .topics import filter_scored_chunks, infer_query_topic
+from .topics import filter_scored_chunks, infer_query_topic, is_programme_topic
 from .vector_store import VectorStore, build_vector_store
 from .whatsapp_parser import DEFAULT_INSTRUCTOR, InstructorIdentity
 from .workflows import (
@@ -56,6 +56,7 @@ from .workflows import (
     format_submission_rules,
     is_submission_channel_query,
     is_submission_requirement_query,
+    resolve_mode,
 )
 
 SNIPPET_LENGTH = 320
@@ -241,13 +242,15 @@ class Assistant:
                 generator="-",
             )
 
-        if mode is AssistantMode.INSTRUCTOR_QA and (
-            is_submission_requirement_query(question) or is_submission_channel_query(question)
-        ):
-            mode = AssistantMode.SUBMISSION_CHECKLIST
+        mode = resolve_mode(question, mode)
 
         results = self._retrieve(question, mode, top_k)
         evidence = self._evidence_level(results)
+        # An off-topic question can still overlap the corpus lexically, and the
+        # deterministic modes would answer it from their rule cards regardless of
+        # retrieval. Refuse before dispatching so every mode refuses identically.
+        if evidence is not EvidenceLevel.HIGH and not is_programme_topic(question):
+            return self._refuse(mode)
         results = self._prune_results(results, evidence, question, mode)
         if mode is AssistantMode.SUBMISSION_CHECKLIST:
             return self._answer_checklist(question, results, mode, evidence)
@@ -255,14 +258,18 @@ class Assistant:
             return self._answer_correction(question, results, mode, evidence)
         return self._answer_qa(question, results, mode, evidence)
 
+    def _refuse(self, mode: AssistantMode) -> Answer:
+        """A refusal, and nothing else: no snippet, no citation, no structured card."""
+        return Answer(
+            text=NO_EVIDENCE_ANSWER,
+            mode=mode,
+            evidence=EvidenceLevel.NONE,
+            generator=self.llm.description,
+        )
+
     def _answer_qa(self, question, results, mode, evidence: EvidenceLevel) -> Answer:
         if not results:
-            return Answer(
-                text=NO_EVIDENCE_ANSWER,
-                mode=mode,
-                evidence=EvidenceLevel.NONE,
-                generator=self.llm.description,
-            )
+            return self._refuse(mode)
         raw, generator = self._generate(
             SYSTEM_PROMPTS[mode], build_user_prompt(question, results, mode)
         )
@@ -382,6 +389,18 @@ class Assistant:
             grounded=bool(re.search(r"\[\d+\]", body)) or not self.llm.generative,
         )
 
+    @staticmethod
+    def _format_missing(analysis) -> str:
+        labels = {
+            "full_name": "ad-soyad",
+            "email": "e-posta",
+            "requested_change": "istenen değişiklik",
+        }
+        missing = analysis.missing_required_info
+        if not missing:
+            return "yok, istek eksiksiz görünüyor"
+        return ", ".join(labels.get(field, field) for field in missing)
+
     def _answer_correction(self, message, results, mode, evidence: EvidenceLevel) -> Answer:
         analysis = analyze_correction_request(message)
         structured = analysis.as_dict()
@@ -399,8 +418,18 @@ class Assistant:
         if evidence is EvidenceLevel.LOW and "kaynaklarda net değil" not in summary.lower():
             summary = "Kaynaklarda bu düzeltme kuralı net değil. " + summary
 
+        # Stated up front rather than left implicit in the JSON. The question behind
+        # every one of these messages is "did this fix it?", and the answer is no.
+        header = (
+            "**Bu bir düzeltme isteği**\n"
+            "- Asistan listeyi değiştiremez; düzeltme otomatik olarak uygulanmaz.\n"
+            "- Değişikliği yalnızca eğitmen yapabilir, yani insan onayı gerekir.\n"
+            "- İsteği e-posta ile gönder; WhatsApp mesajı tek başına yeterli değil.\n"
+            f"- Eksik bilgi: {self._format_missing(analysis)}"
+        )
+
         body = (
-            f"{summary}\n\n"
+            f"{header}\n\n{summary}\n\n"
             "**Yapılandırılmış çıktı**\n```json\n"
             f"{json.dumps(structured, ensure_ascii=False, indent=2)}\n```\n\n"
             "**E-posta taslağı (gönderilmedi, sadece öneri)**\n```\n"
