@@ -1,7 +1,12 @@
-# StajAsistan 2.0 — AI Innovators Knowledge & Submission Assistant
+# StajAsistan 2.0 — AI Innovators Group Operations Assistant
 
-A privacy-aware, citation-grounded **local RAG application** built on **Microsoft Foundry Local**,
-for the Microsoft AI Innovators Summer Internship program.
+A privacy-first, citation-grounded **group operations assistant** built on a **local RAG pipeline**
+and **Microsoft Foundry Local**, for the Microsoft AI Innovators Summer Internship program.
+
+It does two things: it answers questions from the programme's own message archive, and it triages
+messages arriving in the programme's groups — classifying each one, drafting a reply from the
+sources, and deciding whether that draft may be used as-is or has to go to a human first.
+**It never sends anything.** Auto-send is not unimplemented; it is excluded by design.
 
 Project track: *Building Your First Local RAG Application with Foundry Local*.
 
@@ -32,7 +37,7 @@ result with real embeddings, and answers questions **only** from what it actuall
 showing the source snippet behind every answer, and refusing to answer when the sources do not
 cover the question.
 
-It runs in four modes:
+### Answering: four modes
 
 | Mode | What it does |
 | --- | --- |
@@ -42,6 +47,28 @@ It runs in four modes:
 | **Technical Help** | Foundry Local, local model, Python and GitHub questions, grounded in the same sources |
 
 Answers are in Turkish, because the participants are.
+
+### Triage: incoming message simulation
+
+The four modes above assume somebody already decided which mode to open. In a real group nobody
+does that — a message just arrives. The **Gelen Mesaj Simülasyonu** view models that: paste a
+message as it would land in a group, and the assistant classifies the intent, picks the mode
+itself, drafts an answer from the sources, and returns one of three decisions.
+
+| Decision | Meaning |
+| --- | --- |
+| **Draft reply** | The archive answers this with citations. A human copies the draft out. |
+| **Needs human approval** | A draft exists, but the topic or the evidence means a person must read it first |
+| **Do not answer** | The sources do not support an answer. No draft is produced at all. |
+
+A draft is escalated rather than handed over when the message is a roster correction, when it
+touches a certificate, deadline or official document, when it carries personal data, or when the
+answer rests on a rule card that retrieval only weakly corroborates. Everything else with solid
+evidence becomes a copyable draft.
+
+There is **no send button and no outbound adapter anywhere in the codebase**, and a test enforces
+that. The channel field (`whatsapp` / `telegram` / `manual`) is display and audit metadata only:
+nothing reads a credential, opens a socket or contacts a messaging provider.
 
 ## Why local RAG?
 
@@ -103,8 +130,10 @@ WhatsApp .zip / _chat.txt / notes
               ▼
     pipeline.py ── grounding contract: no sources ⇒ no model call ⇒ explicit refusal
               │
+              ├──▶ triage.py ── incoming message ⇒ intent ⇒ mode ⇒ draft ⇒ reply decision
+              │                 (draft / needs approval / do not answer — never send)
               ▼
-        app.py  ── Streamlit UI with citations and evidence level
+        app.py  ── Streamlit UI with citations, evidence level and the triage simulator
 ```
 
 See [`docs/architecture.md`](docs/architecture.md) for the retrieval scoring details and the
@@ -126,6 +155,10 @@ measurements behind every threshold.
   output does not change between runs; the model may only rephrase them.
 - **Duplicate suppression.** The instructor reposted the same announcement roughly every two weeks;
   MMR keeps one copy instead of filling the context window with six.
+- **Incoming-message triage** that routes a raw group message to a mode by itself, so nobody has to
+  know the tool to use it.
+- **Human-in-the-loop by construction.** Three reply decisions, none of which is "send". Sensitive
+  topics and anything carrying personal data are escalated even when the evidence is strong.
 - **Privacy by construction** — see below.
 
 ## Privacy design
@@ -249,7 +282,7 @@ staj-asistan stats
 ## Test
 
 ```bash
-pytest                    # 203 passed, 18 skipped, ~1 second, fully offline
+pytest                    # 269 passed, 18 skipped, ~2 seconds, fully offline
 ```
 
 Tests that load a real embedding model are opt-in, so the default run stays fast:
@@ -268,6 +301,8 @@ What is covered:
 | Retrieval | correct source retrieved, instructor beats participant guess, refusal path, MMR, persistence |
 | Workflows | Turkish negation handling, checklist completeness, correction schema, identity gaps |
 | Pipeline | the four demo scenarios end-to-end, no-sources-no-model-call contract, invalid citation stripping |
+| Triage | intent classification, every branch of the reply policy, and the no-send guarantee: no outbound decision, no sending callable, no messaging endpoint or credential in any module, no send button in the UI |
+| UI | the simulator view rendered headlessly — the standing warning, a copyable draft on success, and no draft block at all on refusal |
 
 ## Demo questions
 
@@ -297,9 +332,9 @@ images by pressing **Örnek veri** and running the four demo questions above.
 
 Stated plainly, because knowing where a system is weak is part of shipping it:
 
-- **The offline `hashing` backend has weak semantic refusal.** On an evaluation set of 12 in-scope
-  and 9 out-of-scope questions, the sentence-transformers backend answered 12/12 and refused 9/9.
-  The hashing fallback also answered 12/12 but wrongly accepted 5 of the 9 off-topic questions,
+- **The offline `hashing` backend has weak semantic refusal.** On an evaluation set of 10 in-scope
+  and 8 out-of-scope questions, the sentence-transformers backend answered 10/10 and refused 8/8.
+  The hashing fallback also answered 10/10 but wrongly accepted 5 of the 8 off-topic questions,
   because bag-of-words vectors cannot tell that "Mars'a ne zaman insan gönderilecek?" is unrelated
   when it shares the stems *zaman* and *gönder* with the corpus. Use a real embedding backend for
   anything beyond tests.
@@ -313,6 +348,11 @@ Stated plainly, because knowing where a system is weak is part of shipping it:
   are not stored in this repository.
 - **Retrieval thresholds are calibrated on this corpus** and would need re-measuring on a very
   different one.
+- **Triage is a simulation, not an integration.** Messages are pasted in by hand. There is no
+  WhatsApp or Telegram connection, and the channel field changes nothing about how a message is
+  handled — it is a label. Connecting a real group is future work, and deliberately so: the
+  official WhatsApp Business API needs a reviewed business account, and the unofficial route means
+  automating WhatsApp Web, which violates the terms of service and would put a live group at risk.
 
 ## Future work
 
@@ -323,6 +363,15 @@ Stated plainly, because knowing where a system is weak is part of shipping it:
 - Conversational memory with query rewriting for follow-up questions.
 - An evaluation harness with a labelled question set, so retrieval changes can be measured rather
   than eyeballed.
+- **A read-only webhook adapter** for a channel that permits one — Telegram's Bot API is the
+  realistic candidate, since it is official and does not require a business review. It would feed
+  `IncomingMessage` from a webhook payload instead of a text box. The triage boundary is already
+  shaped for it: `triage()` takes a message object and returns a decision, and knows nothing about
+  where the message came from.
+- **An approval queue** so escalated drafts land somewhere an instructor can review them, rather
+  than on the screen of whoever ran the simulation.
+- Even with an adapter, sending stays manual. The step that puts text in front of 500 people is the
+  one worth keeping a human on.
 
 ## What I learned
 

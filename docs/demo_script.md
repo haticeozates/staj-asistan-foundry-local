@@ -24,7 +24,9 @@ labelled as such. That is worth showing on purpose if you have a spare thirty se
 
 ## 1. "Final tesliminde ne gerekiyor?" — grounded answer
 
-*Instructor Q&A mode.*
+*Submission Checklist mode.* You can leave the sidebar on Instructor Q&A and it still lands there:
+submission-rule questions are re-routed automatically, because in practice nobody picks the mode
+before asking. Worth mentioning in one sentence — it is the same routing the simulator uses later.
 
 Expect a short Turkish answer covering the code link, the two-minute video and sending both by
 e-mail, with numbered citations underneath.
@@ -89,9 +91,32 @@ Ask something the corpus cannot answer.
 
 Expect: *"Bu konu elimdeki kaynaklarda net değil"*, an explanation, and suggestions for rephrasing.
 
-**Close on this.** The model was never called. Retrieval found nothing above threshold, so
-generation was skipped entirely — the guarantee is structural, not a polite instruction in a
-prompt. Most demos avoid this question; it is the one worth showing.
+The model was never called. Retrieval found nothing above threshold, so generation was skipped
+entirely — the guarantee is structural, not a polite instruction in a prompt. Most demos avoid this
+question; it is the one worth showing.
+
+## 6. Incoming message simulation — the operations story
+
+Switch the sidebar **Görünüm** to *Gelen Mesaj Simülasyonu*. Read the standing warning aloud once:
+the system never sends anything, it only drafts for a human.
+
+Run three of the sample buttons and let the decision column tell the story:
+
+| Message | Decision | Why it matters |
+| --- | --- | --- |
+| *GitHub repo hazır ama video çekmedim, teslim olur mu?* | Draft reply | Routine, well-covered question. The draft is copyable as-is. |
+| *Listede projem yanlış görünüyor…* | Needs human approval | Strong evidence, still escalated. Only the instructor can edit a roster. |
+| *İstanbul'da hava nasıl?* | Do not answer | No evidence, and therefore no draft at all — not even a hedged one. |
+
+**Two points to land.** First, nobody chose a mode: the assistant read the message, picked
+Submission Checklist, Correction Analyzer and Instructor Q&A by itself, and showed which one it
+picked. Second, and this is the close: there is no send button, and there is no sending code behind
+the screen either. The escalation rules fire *on top of* strong evidence, because a confident wrong
+answer about somebody's certificate is worse than an uncertain one, not better.
+
+If asked why this is not connected to a real group: the official WhatsApp Business API needs a
+reviewed business account, and the unofficial route means automating WhatsApp Web against its terms
+of service. Neither belongs in a public repository built on other people's messages.
 
 ## If something goes wrong
 

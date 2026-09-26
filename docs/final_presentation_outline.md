@@ -24,6 +24,10 @@ Two details worth stating, because they shape everything after:
 A local RAG assistant on Foundry Local, with four modes: instructor Q&A, submission checklist,
 correction request analyzer, and technical help. Turkish answers, every one with citations.
 
+On top of that, an incoming-message simulator: paste a message as it would arrive in a group, and
+the assistant classifies it, picks the mode itself, drafts a reply, and decides whether that draft
+can be used as-is or has to go to a human. It never sends — that is the product, not a gap.
+
 One sentence for why local: the data is exactly the kind you must not upload, and the corpus is
 small enough that a small local model with good retrieval beats a large remote one that cannot
 legally see it.
@@ -36,15 +40,19 @@ One diagram, four things to say:
 - Retrieval is **hybrid** — embeddings plus lexical — because programme vocabulary is exact.
 - Instructor messages are **weighted**, participant guesses damped.
 - **No evidence means no model call.** The refusal path is structural.
+- **Triage sits on top, not inside.** It picks the mode and judges the answer; the grounding
+  contract underneath is untouched.
 
 Do not read the module list. It is in the README.
 
 ## 4. Live demo (4 min)
 
-Follow [`demo_script.md`](demo_script.md): grounded answer → authority weighting → checklist →
-correction analyzer → refusal.
+Follow [`demo_script.md`](demo_script.md): grounded answer, authority weighting, checklist,
+correction analyzer, refusal, then the incoming-message simulator.
 
-Finish on the refusal. It is the least common thing to demo and the most convincing.
+Finish on the simulator, and specifically on the message that gets refused with no draft at all.
+Refusal is the least common thing to demo and the most convincing; refusing inside a workflow that
+could plausibly have replied is better still.
 
 ## 5. Engineering decisions worth defending (1.5 min)
 
@@ -64,10 +72,11 @@ Pick two or three; do not list all of them.
 
 Say these before anyone asks:
 
-- The dependency-free fallback backend refuses out-of-scope questions poorly — 4 of 9 versus 9 of 9
+- The dependency-free fallback backend refuses out-of-scope questions poorly — 3 of 8 versus 8 of 8
   for real embeddings. Measured, documented, and the reason a real backend is recommended.
 - No Turkish NER, so a name inside free-form prose can survive masking.
 - Single-turn; no conversation memory.
+- The simulator is a simulation. Messages are pasted in by hand; no group is connected.
 
 Knowing where a system is weak is part of shipping it.
 
@@ -84,6 +93,8 @@ Knowing where a system is weak is part of shipping it.
 | --- | --- |
 | Why not use a cloud model? | The input data is personal. Also unnecessary: the generation step only has to summarise retrieved snippets. |
 | What if Foundry Local is not running? | Retrieval still works; generation degrades to verbatim quotation, clearly labelled. Hallucination becomes impossible. |
-| How do you know retrieval works? | A 21-question evaluation set: 12 in-scope answered, 9 out-of-scope refused with real embeddings. |
+| How do you know retrieval works? | An 18-question evaluation set: 10 in-scope answered, 8 out-of-scope refused with real embeddings. |
 | Could it update the roster automatically? | It could. It should not. It drafts; a human approves. |
 | Does it work on other WhatsApp exports? | Yes — both iOS and Android formats, six date variants, all tested. The instructor aliases are configuration. |
+| Why is it not connected to the real group? | The official WhatsApp API needs a reviewed business account; the unofficial route means automating WhatsApp Web against its terms of service. Neither belongs in a public repo built on other people's messages. |
+| So could you add auto-reply? | Technically yes, and the triage boundary is already shaped for it. I left it out on purpose: the step that puts text in front of 500 people is the one worth keeping a human on. |

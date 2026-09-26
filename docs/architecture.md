@@ -9,10 +9,15 @@ raw export ─▶ ingestion ─▶ parsing ─▶ masking ─▶ chunking ─▶
                                                                             │
 question ─▶ retrieval (dense + lexical, weighted) ─▶ threshold ─┬─ below ─▶ refusal
                                                                 └─ above ─▶ prompt ─▶ model ─▶ answer + citations
+
+incoming message ─▶ triage ─▶ intent ─▶ mode ─▶ (the pipeline above) ─▶ reply decision
 ```
 
 The refusal branch is the important one: when nothing clears the threshold, the language model is
 never called at all. A model that is not invoked cannot hallucinate.
+
+Triage sits on top rather than inside: it chooses how to ask, and judges what may be done with the
+answer, but the grounding contract below it is unchanged.
 
 ## 1. Ingestion (`ingestion.py`)
 
@@ -172,3 +177,52 @@ call the model only if there is evidence, attach citations, verify the markers.
 
 Retrieval parameters are tuned per mode — the checklist mode wants breadth across submission rules,
 the Q&A mode wants precision on a single question.
+
+## 11. Triage (`triage.py`)
+
+Everything above assumes a person opened the tool and chose a mode. Triage models the case that
+actually occurs: a message lands in a group and something has to decide what to do with it.
+
+It is a thin layer on purpose. Intent classification reuses the routing heuristics that already
+exist — `is_submission_channel_query`, `is_submission_requirement_query`, `suggest_mode` and the
+retrieval-side `infer_query_topic` — instead of growing a second, competing set of keyword lists
+that would drift out of sync with the first. Order matters more than the individual checks: the
+roster vocabulary overlaps nearly everything, so *"listede projem yanlış"* has to be recognised as
+a correction before the word "liste" pulls it into the roster lane.
+
+Falling back to `infer_query_topic` also closes a real gap. The mode hints do not list
+*"çalışmazsa"*, so *"Foundry Local çalışmazsa ne kontrol etmeliyim?"* used to route to general Q&A;
+the retrieval vocabulary does list it, and triage now picks technical help.
+
+### The reply policy
+
+Three outcomes, applied in this precedence:
+
+| Order | Condition | Decision |
+| --- | --- | --- |
+| 1 | No evidence at all | Do not answer |
+| 2 | Correction request | Needs human approval |
+| 3 | Sensitive topic — certificate, deadline, official document, personal record | Needs human approval |
+| 4 | The message itself carries personal data | Needs human approval |
+| 5 | Low evidence, answer from a deterministic rule card | Needs human approval |
+| 6 | Low evidence, everything else | Do not answer |
+| 7 | Medium or high evidence | Draft reply |
+
+Rules 5 and 6 are the interesting split. Treating low evidence as an automatic refusal throws away
+correct answers: *"WhatsApp'tan yazmam yeterli mi?"* is answered by a deterministic rule card, and
+the low score means the retrieved snippets corroborate it thinly, not that the answer is doubtful.
+Escalating instead of refusing keeps the answer available to a human who can confirm it in seconds.
+
+Rules 2 through 4 fire regardless of how strong the evidence is. A confidently-worded certificate
+answer is more dangerous than an uncertain one, not less, because the cost of being wrong lands on
+a participant who cannot undo it.
+
+### No outbound path
+
+There is no fourth decision, no sending function, no messaging endpoint and no credential read
+anywhere in the package, and tests assert each of those. The channel on an `IncomingMessage` is
+metadata: a test triages the same message as WhatsApp, Telegram and manual input and asserts the
+decision and the draft are byte-identical.
+
+This is a design position, not a missing feature, so every result reports it: `as_dict()` always
+includes `auto_send: False`.

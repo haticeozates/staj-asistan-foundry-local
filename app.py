@@ -14,7 +14,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
 from staj_asistan.models import AssistantMode, EvidenceLevel  # noqa: E402
 from staj_asistan.pipeline import Assistant  # noqa: E402
+from staj_asistan.triage import (  # noqa: E402
+    Channel,
+    IncomingMessage,
+    MessageIntent,
+    ReplyDecision,
+    triage,
+)
 from staj_asistan.workflows import suggest_mode  # noqa: E402
+
+# The simulator is a view, not a fifth AssistantMode: it picks one of the four
+# existing modes for you rather than adding a new answering style.
+VIEW_ASSISTANT = "Asistan"
+VIEW_TRIAGE = "Gelen Mesaj Simülasyonu"
 
 MODE_LABELS: dict[AssistantMode, str] = {
     AssistantMode.INSTRUCTOR_QA: "Eğitmen Soru-Cevap",
@@ -50,6 +62,41 @@ DEMO_QUESTIONS: list[tuple[str, AssistantMode]] = [
     ),
 ]
 
+CHANNEL_LABELS: dict[Channel, str] = {
+    Channel.WHATSAPP: "WhatsApp grubu",
+    Channel.TELEGRAM: "Telegram grubu",
+    Channel.MANUAL: "Elle giriş",
+}
+
+INTENT_LABELS: dict[MessageIntent, str] = {
+    MessageIntent.SUBMISSION_REQUIREMENT: "Teslim kuralı / durumu",
+    MessageIntent.SUBMISSION_CHANNEL: "Teslim kanalı",
+    MessageIntent.ROSTER_CONTINUE: "Liste / devam durumu",
+    MessageIntent.CORRECTION_REQUEST: "Düzeltme isteği",
+    MessageIntent.TECHNICAL_HELP: "Teknik yardım",
+    MessageIntent.CERTIFICATE: "Sertifika",
+    MessageIntent.UNKNOWN: "Sınıflandırılamadı",
+}
+
+DECISION_BADGES: dict[ReplyDecision, tuple[str, str]] = {
+    ReplyDecision.DRAFT_REPLY: ("Taslak hazır - insan kopyalayıp gönderir", "success"),
+    ReplyDecision.NEEDS_HUMAN_APPROVAL: ("İnsan onayı gerekiyor", "warning"),
+    ReplyDecision.DO_NOT_ANSWER: ("Cevaplama - eğitmene yönlendir", "error"),
+}
+
+SIMULATION_NOTICE = (
+    "Bu bir simülasyondur. Sistem hiçbir kanala otomatik mesaj göndermez; "
+    "sadece insan onayı için cevap taslağı üretir."
+)
+
+INCOMING_SAMPLES: list[str] = [
+    "GitHub repo hazır ama video çekmedim, teslim olur mu?",
+    "Listede projem yanlış görünüyor, Foundry Local olarak güncellenmesini istiyorum.",
+    "WhatsApp'tan yazmam yeterli mi?",
+    "Sertifikam ne zaman gelir?",
+    "İstanbul'da hava nasıl?",
+]
+
 
 st.set_page_config(page_title="StajAsistan 2.0", page_icon="📘", layout="wide")
 
@@ -61,10 +108,16 @@ def get_assistant() -> Assistant:
     return st.session_state.assistant
 
 
-def render_sidebar(assistant: Assistant) -> AssistantMode:
+def render_sidebar(assistant: Assistant) -> tuple[str, AssistantMode]:
     with st.sidebar:
         st.title("StajAsistan 2.0")
-        st.caption("AI Innovators Knowledge & Submission Assistant")
+        st.caption("AI Innovators grup operasyon asistanı")
+
+        view = st.radio(
+            "Görünüm",
+            options=[VIEW_ASSISTANT, VIEW_TRIAGE],
+            horizontal=True,
+        )
 
         st.subheader("Veri")
         uploads = st.file_uploader(
@@ -111,6 +164,8 @@ def render_sidebar(assistant: Assistant) -> AssistantMode:
             format_func=lambda m: MODE_LABELS[m],
             label_visibility="collapsed",
             key="mode_choice",
+            disabled=view == VIEW_TRIAGE,
+            help="Simülasyonda mod otomatik seçilir." if view == VIEW_TRIAGE else None,
         )
 
         with st.expander("Çalışma zamanı"):
@@ -122,7 +177,7 @@ def render_sidebar(assistant: Assistant) -> AssistantMode:
             "Gizlilik: e-posta, telefon, özel link ve katılımcı listeleri indeksleme sırasında "
             "maskelenir; ham dışa aktarımlar depoya yazılmaz."
         )
-    return mode
+    return view, mode
 
 
 def render_answer(answer) -> None:
@@ -151,21 +206,96 @@ def render_answer(answer) -> None:
     st.caption(f"Üretim: {answer.generator}")
 
 
-def main() -> None:
-    assistant = get_assistant()
-    mode = render_sidebar(assistant)
+def render_triage_view(assistant: Assistant) -> None:
+    st.header(VIEW_TRIAGE)
+    st.warning(SIMULATION_NOTICE)
+    st.caption(
+        "Gruba düşmüş bir mesajı buraya yapıştır. Asistan niyeti sınıflandırır, modu kendisi "
+        "seçer ve cevabın gönderilebilir mi yoksa eğitmene mi gitmesi gerektiğine karar verir."
+    )
 
+    st.write("**Örnek gelen mesajlar**")
+    sample_columns = st.columns(len(INCOMING_SAMPLES))
+    for column, sample in zip(sample_columns, INCOMING_SAMPLES):
+        short = sample if len(sample) <= 34 else sample[:31] + "…"
+        if column.button(short, use_container_width=True, help=sample, key=f"sample-{short}"):
+            st.session_state["incoming_text"] = sample
+            st.session_state.pop("triage", None)
+            st.rerun()
+
+    st.session_state.setdefault("incoming_text", "")
+    with st.form("triage_form"):
+        meta_left, meta_mid, meta_right = st.columns(3)
+        channel = meta_left.selectbox(
+            "Kanal",
+            options=list(Channel),
+            format_func=lambda c: CHANNEL_LABELS[c],
+            help="Yalnızca etiket olarak saklanır; hiçbir kanala bağlanılmaz.",
+        )
+        group = meta_mid.text_input("Grup", value="AI Innovators - Örnek Grup")
+        sender_alias = meta_right.text_input(
+            "Gönderen takma adı",
+            value="Katılımcı#0001",
+            help="Gerçek ad yazma. Bu alan yalnızca takma ad içindir.",
+        )
+        text = st.text_area(
+            "Gelen mesaj",
+            placeholder="Örnek: GitHub repo hazır ama video çekmedim, teslim olur mu?",
+            height=120,
+            key="incoming_text",
+        )
+        analysed = st.form_submit_button("Mesajı analiz et", type="primary")
+
+    if analysed:
+        if text.strip():
+            with st.spinner("Mesaj sınıflandırılıyor…"):
+                st.session_state["triage"] = triage(
+                    IncomingMessage(
+                        text=text,
+                        channel=channel,
+                        group=group,
+                        sender_alias=sender_alias,
+                    ),
+                    assistant,
+                )
+        else:
+            st.warning("Önce bir mesaj yapıştır.")
+
+    result = st.session_state.get("triage")
+    if result is None:
+        return
+
+    label, kind = DECISION_BADGES[result.reply_decision]
+    getattr(st, kind)(f"**Karar:** {label}")
+    st.caption(result.reason)
+
+    left, mid, right = st.columns(3)
+    left.metric("Niyet", INTENT_LABELS[result.intent])
+    mid.metric("Seçilen mod", MODE_LABELS[result.selected_mode])
+    right.metric("Kanıt", EVIDENCE_BADGES[result.evidence_level][0].split(":")[-1].strip())
+
+    if result.draft_reply:
+        st.subheader("Cevap taslağı")
+        st.caption("Kopyala, kontrol et, göndermeyi sen yap. Sistemde gönderim yolu yok.")
+        st.code(result.draft_reply, language=None, wrap_lines=True)
+    else:
+        st.info("Taslak üretilmedi: kaynaklar bu mesaja cevap vermiyor.")
+
+    if result.source_categories:
+        st.caption(
+            "Kaynak kategorileri: " + ", ".join(c.value for c in result.source_categories)
+        )
+
+    with st.expander("Kullanılan kaynaklar ve ham cevap"):
+        render_answer(result.answer)
+
+
+def render_assistant_view(assistant: Assistant, mode: AssistantMode) -> None:
     st.header(MODE_LABELS[mode])
     st.caption(
         "Cevaplar yalnızca indekslenmiş kaynaklara dayanır. Kaynaklarda karşılık yoksa asistan "
         "cevap üretmez."
     )
-
-    if assistant.is_empty:
-        st.info(
-            "Henüz indekslenmiş kaynak yok. Soldaki **Örnek veri** düğmesiyle başlayabilir "
-            "veya kendi WhatsApp dışa aktarımını yükleyebilirsin."
-        )
 
     st.write("**Demo soruları**")
     demo_columns = st.columns(len(DEMO_QUESTIONS))
@@ -204,6 +334,22 @@ def main() -> None:
     # Rendered outside the click branch so the answer survives later reruns.
     if st.session_state.get("answer") is not None:
         render_answer(st.session_state["answer"])
+
+
+def main() -> None:
+    assistant = get_assistant()
+    view, mode = render_sidebar(assistant)
+
+    if assistant.is_empty:
+        st.info(
+            "Henüz indekslenmiş kaynak yok. Soldaki **Örnek veri** düğmesiyle başlayabilir "
+            "veya kendi WhatsApp dışa aktarımını yükleyebilirsin."
+        )
+
+    if view == VIEW_TRIAGE:
+        render_triage_view(assistant)
+    else:
+        render_assistant_view(assistant, mode)
 
 
 if __name__ == "__main__":
