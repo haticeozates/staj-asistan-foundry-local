@@ -322,16 +322,22 @@ Walkthrough with expected behaviour: [`docs/demo_script.md`](docs/demo_script.md
 
 ![StajAsistan UI](screenshots/uygulama.png)
 
-This capture is the app answering *Final tesliminde ne gerekiyor?* after **Örnek veri** was loaded.
-It uses only the anonymised files in `data/samples/`; no real WhatsApp export, name, e-mail or
-local path is visible.
+This capture is the incoming-message simulator triaging *"GitHub repo hazır ama video çekmedim,
+teslim olur mu?"*. Nobody picked a mode: the assistant classified the intent, chose Submission
+Checklist itself, rated the evidence, and decided the draft is good enough to hand to a human —
+who still has to copy it out, because there is no send path.
+
+It was taken with **Temizle** followed by **Örnek veri**, so the index holds only the anonymised
+files in `data/samples/`; the sidebar names all three. No real WhatsApp export, file name, person
+name, e-mail address, phone number or local path is visible.
 
 `screenshots/` is the only directory in this repository that may contain images, and only under
 one condition: the capture must show this application running on the anonymised sample data.
 
 Do not commit a screenshot of a chat window, a desktop, an editor, or anything showing the real
-corpus — a single such image undoes the masking the rest of the pipeline performs. Reproduce the
-images by pressing **Örnek veri** and running the four demo questions above.
+corpus — a single such image undoes the masking the rest of the pipeline performs. Reproduce it by
+pressing **Temizle**, then **Örnek veri**. The clear step matters: the index is cumulative, so a
+real export opened earlier in the same session would otherwise appear in the citations.
 
 ## Limitations
 
