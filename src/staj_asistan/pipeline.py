@@ -48,10 +48,13 @@ from .topics import filter_scored_chunks, infer_query_topic
 from .vector_store import VectorStore, build_vector_store
 from .whatsapp_parser import DEFAULT_INSTRUCTOR, InstructorIdentity
 from .workflows import (
+    CHANNEL_RULE_LINES,
     SUBMISSION_RULE_LINES,
     analyze_correction_request,
     analyze_submission,
+    format_channel_rules,
     format_submission_rules,
+    is_submission_channel_query,
     is_submission_requirement_query,
 )
 
@@ -238,7 +241,9 @@ class Assistant:
                 generator="-",
             )
 
-        if mode is AssistantMode.INSTRUCTOR_QA and is_submission_requirement_query(question):
+        if mode is AssistantMode.INSTRUCTOR_QA and (
+            is_submission_requirement_query(question) or is_submission_channel_query(question)
+        ):
             mode = AssistantMode.SUBMISSION_CHECKLIST
 
         results = self._retrieve(question, mode, top_k)
@@ -275,6 +280,8 @@ class Assistant:
         )
 
     def _answer_checklist(self, status_text, results, mode, evidence: EvidenceLevel) -> Answer:
+        if is_submission_channel_query(status_text):
+            return self._answer_channel_rules(status_text, results, mode, evidence)
         if is_submission_requirement_query(status_text):
             return self._answer_submission_rules(status_text, results, mode, evidence)
 
@@ -325,6 +332,39 @@ class Assistant:
         else:
             body = (
                 f"{body}\n\n_Not: İndekste teslim kurallarını içeren kaynak bulunamadı; "
+                "yukarıdaki maddeler program kurallarından türetilmiştir._"
+            )
+
+        if evidence is EvidenceLevel.LOW and "kaynaklarda net değil" not in body.lower():
+            body = f"{body}\n\n_Bu konu kaynaklarda net değil; kurallar program özetinden, notlar ise en yakın eşleşmelerden üretildi._"
+
+        return Answer(
+            text=body,
+            mode=mode,
+            evidence=evidence if results else EvidenceLevel.LOW,
+            citations=self._citations(results),
+            retrieved=results,
+            structured=structured,
+            generator=generator,
+            grounded=bool(re.search(r"\[\d+\]", body)) or not self.llm.generative,
+        )
+
+    def _answer_channel_rules(self, question, results, mode, evidence: EvidenceLevel) -> Answer:
+        body = format_channel_rules()
+        generator = "kural tabanlı"
+        structured = {"tur": "teslim_kanali", "gerekler": list(CHANNEL_RULE_LINES)}
+
+        if results:
+            raw, generator = self._generate(
+                SYSTEM_PROMPTS[mode],
+                build_user_prompt(question, results, mode),
+                max_tokens=450,
+            )
+            note = self._strip_invalid_markers(raw, len(results))
+            body = f"{body}\n\n**Kaynaklara göre not**\n{note}"
+        else:
+            body = (
+                f"{body}\n\n_Not: İndekste kanal kuralını içeren kaynak bulunamadı; "
                 "yukarıdaki maddeler program kurallarından türetilmiştir._"
             )
 

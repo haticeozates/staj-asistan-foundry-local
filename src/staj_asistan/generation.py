@@ -221,6 +221,8 @@ class ExtractiveClient(LLMClient):
                 continue
             if self._ANECDOTE_RE.search(sentence):
                 continue
+            if sentence.endswith("?"):
+                continue
             sent_stems = set(content_tokens(sentence))
             score = len(question_stems & sent_stems)
             lowered = sentence.lower()
@@ -233,8 +235,6 @@ class ExtractiveClient(LLMClient):
                 score += 2
             if self._ACTION_RE.search(sentence):
                 score += 2
-            if sentence.endswith("?"):
-                score -= 2
             if question_stems and sent_stems:
                 overlap = len(question_stems & sent_stems) / len(question_stems | sent_stems)
                 if overlap >= 0.65:

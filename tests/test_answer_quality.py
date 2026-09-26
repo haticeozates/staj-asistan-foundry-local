@@ -97,6 +97,36 @@ class TestSubmissionAndTechnicalRouting:
         assert "servis" in short or "port" in short or "endpoint" in short or "model" in short
 
 
+GITHUB_CONTENTS_QUERY = "GitHub'a ne koymam gerekiyor?"
+WHATSAPP_CHANNEL_QUERY = "WhatsApp'tan yazmam yeterli mi?"
+AZURE_DRIFT_MARKERS = ("öğrenci kimliği", "ogrenci kimligi", "azure")
+
+
+class TestGithubContentsAndWhatsappChannel:
+    def test_github_contents_covers_code_video_and_email(self):
+        answer = _extractive_assistant().ask(GITHUB_CONTENTS_QUERY)
+        text = answer.text.lower()
+        assert "github" in text or "kaynak kod" in text or "source" in text
+        assert "video" in text
+        assert "e-posta" in text or "e-mail" in text or "eposta" in text
+        assert answer.mode is AssistantMode.SUBMISSION_CHECKLIST
+
+    def test_whatsapp_channel_says_no_and_requires_email(self):
+        answer = _extractive_assistant().ask(WHATSAPP_CHANNEL_QUERY)
+        text = answer.text.lower()
+        assert "hayır" in text or "yeterli değil" in text or "yerine geçmez" in text
+        assert "e-posta" in text or "e-mail" in text or "eposta" in text
+        assert "evet linkler yeterli" not in text
+        assert answer.mode is AssistantMode.SUBMISSION_CHECKLIST
+
+    def test_neither_answer_drifts_to_github_student_azure(self):
+        for question in (GITHUB_CONTENTS_QUERY, WHATSAPP_CHANNEL_QUERY):
+            answer = _extractive_assistant().ask(question)
+            blob = _blob(answer)
+            for marker in AZURE_DRIFT_MARKERS:
+                assert marker not in blob, f"{question!r} drifted to {marker!r}"
+
+
 class TestExtractiveFormatAndCitations:
     def test_extractive_fallback_uses_readable_headings(self):
         answer = _extractive_assistant().ask(LISTE_QUERY)

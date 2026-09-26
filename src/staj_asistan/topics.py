@@ -10,7 +10,7 @@ troubleshooting text answer a "should I keep working?" question.
 
 from __future__ import annotations
 
-from .models import AssistantMode, ChunkCategory, ScoredChunk
+from .models import AssistantMode, AuthorRole, ChunkCategory, ScoredChunk
 
 # --------------------------------------------------------------------------------------
 # Normalisation
@@ -164,9 +164,16 @@ _SUBMISSION_QUERY_HINTS = (
     "video çek",
     "video cek",
     "github repo",
+    "github'a ne",
+    "github’a ne",
+    "ne koymam",
     "eksiğim",
     "eksigim",
     "kaynak kod",
+    "yazmam yeterli",
+    "whatsapp'tan yaz",
+    "whatsapp’tan yaz",
+    "whatsapp yeterli",
 )
 
 _TECHNICAL_QUERY_HINTS = (
@@ -225,14 +232,12 @@ _ALLOWED_CATEGORIES: dict[ChunkCategory, frozenset[ChunkCategory]] = {
             ChunkCategory.CORRECTION,
             ChunkCategory.ROSTER,
             ChunkCategory.SUBMISSION,
-            ChunkCategory.GENERAL,
         }
     ),
     ChunkCategory.SUBMISSION: frozenset(
         {
             ChunkCategory.SUBMISSION,
-            ChunkCategory.ROSTER,
-            ChunkCategory.GENERAL,
+            ChunkCategory.CORRECTION,
         }
     ),
     ChunkCategory.TECHNICAL: frozenset(
@@ -252,12 +257,20 @@ def allowed_categories(query: str, mode: AssistantMode) -> frozenset[ChunkCatego
     return _ALLOWED_CATEGORIES[infer_query_topic(query, mode)]
 
 
+def _is_participant_question(chunk) -> bool:
+    """True for participant-only question turns that should not stand in as rules."""
+    if chunk.role is not AuthorRole.PARTICIPANT:
+        return False
+    text = chunk.text.strip()
+    return text.endswith("?") or ("?" in text and "eğitmen:" not in text.lower())
+
+
 def filter_scored_chunks(
     results: list[ScoredChunk], query: str, mode: AssistantMode
 ) -> list[ScoredChunk]:
     """Drop off-lane chunks after scoring, keeping original order otherwise."""
     allowed = allowed_categories(query, mode)
-    if allowed == frozenset(ChunkCategory):
-        return results
-    filtered = [item for item in results if item.chunk.category in allowed]
-    return filtered
+    if allowed != frozenset(ChunkCategory):
+        results = [item for item in results if item.chunk.category in allowed]
+    official = [item for item in results if not _is_participant_question(item.chunk)]
+    return official or results

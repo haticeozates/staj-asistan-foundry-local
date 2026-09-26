@@ -25,6 +25,9 @@ data/raw/
 !screenshots/
 !screenshots/*.png
 
+# Local demo/review packages — screenshots and notes stay off the remote
+review/
+
 # --- Local vector index / model caches ---------------------------------------
 .chroma/
 chroma_db/

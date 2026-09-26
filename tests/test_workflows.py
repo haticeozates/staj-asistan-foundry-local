@@ -111,6 +111,17 @@ class TestSubmissionRequirementQuery:
         assert "whatsapp" in text
         assert "çekmedim" not in text
 
+    def test_github_contents_question_is_a_rules_question(self):
+        from staj_asistan.workflows import is_submission_requirement_query
+
+        assert is_submission_requirement_query("GitHub'a ne koymam gerekiyor?") is True
+
+    def test_whatsapp_channel_question_is_detected(self):
+        from staj_asistan.workflows import is_submission_channel_query
+
+        assert is_submission_channel_query("WhatsApp'tan yazmam yeterli mi?") is True
+        assert is_submission_channel_query("Final tesliminde ne gerekiyor?") is False
+
 
 class TestCorrectionAnalyzer:
     MESSAGE = "Listede adım yanlış, projem Foundry Local olmalı, devam etmek istiyorum."
@@ -206,6 +217,8 @@ class TestModeSuggestion:
             ("Listede projem yanlış görünüyor", AssistantMode.CORRECTION_ANALYZER),
             ("GitHub repo hazır ama video çekmedim", AssistantMode.SUBMISSION_CHECKLIST),
             ("Final tesliminde ne gerekiyor?", AssistantMode.SUBMISSION_CHECKLIST),
+            ("GitHub'a ne koymam gerekiyor?", AssistantMode.SUBMISSION_CHECKLIST),
+            ("WhatsApp'tan yazmam yeterli mi?", AssistantMode.SUBMISSION_CHECKLIST),
             ("Foundry Local endpoint hatası alıyorum", AssistantMode.TECHNICAL_HELP),
             ("Sertifika ne zaman gelir", AssistantMode.INSTRUCTOR_QA),
         ],

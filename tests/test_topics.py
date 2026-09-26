@@ -80,6 +80,20 @@ class TestQueryTopic:
         )
         assert topic.value == "submission"
 
+    def test_github_contents_query_is_submission(self):
+        topic = infer_query_topic(
+            "GitHub'a ne koymam gerekiyor?",
+            AssistantMode.INSTRUCTOR_QA,
+        )
+        assert topic.value == "submission"
+
+    def test_whatsapp_channel_query_is_not_general(self):
+        topic = infer_query_topic(
+            "WhatsApp'tan yazmam yeterli mi?",
+            AssistantMode.INSTRUCTOR_QA,
+        )
+        assert topic.value in {"submission", "correction"}
+
 
 class TestFilterScoredChunks:
     def test_roster_query_drops_technical_chunks(self):

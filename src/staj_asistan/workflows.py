@@ -194,13 +194,39 @@ _STATUS_QUERY_HINTS = (
     "gönderdim",
     "teslim durumu",
 )
+_CONTENTS_QUERY_HINTS = (
+    "ne koymam",
+    "ne koymalıyım",
+    "neler koymalıyım",
+    "ne yüklemeliyim",
+    "içine ne",
+    "github'a ne",
+    "github’a ne",
+)
+_CHANNEL_QUERY_HINTS = (
+    "yeterli",
+    "yeter mi",
+    "yazmam",
+    "yazsam",
+    "gruba yaz",
+    "whatsapp'tan",
+    "whatsapp’tan",
+)
 
 SUBMISSION_RULE_LINES: tuple[str, ...] = (
     "GitHub / kaynak kod linki gerekir (public bir link de kabul edilir).",
+    "README / proje açıklaması önerilir (zorunlu değil).",
     "Kısa demo videosu gerekir: ne yaptım, ne öğrendim (yaklaşık 2 dakika).",
     "Kod ve video linkleri e-posta ile gönderilmelidir.",
     "Video yoksa teslim eksik sayılır.",
     "WhatsApp mesajı tek başına teslim yerine geçmez.",
+)
+
+CHANNEL_RULE_LINES: tuple[str, ...] = (
+    "Hayır, WhatsApp tek başına yeterli değil.",
+    "Teslim ve düzeltme istekleri e-posta ile gönderilmelidir.",
+    "Düzeltme isteklerinde ad-soyad ve e-posta açık yazılmalıdır.",
+    "Teslimde GitHub/source code ve video linkleri e-posta ile gönderilmelidir.",
 )
 
 
@@ -209,15 +235,31 @@ def is_submission_requirement_query(text: str) -> bool:
     lowered = _lower(text)
     if any(hint in lowered for hint in _STATUS_QUERY_HINTS):
         return False
-    if "teslim" not in lowered and "final teslim" not in lowered:
+    if "teslim" in lowered and any(hint in lowered for hint in _REQUIREMENT_QUERY_HINTS):
+        return True
+    has_github = "github" in lowered or "kaynak kod" in lowered or "source code" in lowered
+    return has_github and any(hint in lowered for hint in _CONTENTS_QUERY_HINTS)
+
+
+def is_submission_channel_query(text: str) -> bool:
+    """True when the user asks whether WhatsApp is enough for teslim/düzeltme."""
+    lowered = _lower(text)
+    if "whatsapp" not in lowered:
         return False
-    return any(hint in lowered for hint in _REQUIREMENT_QUERY_HINTS)
+    return any(hint in lowered for hint in _CHANNEL_QUERY_HINTS)
 
 
 def format_submission_rules() -> str:
     """Canonical submission-requirement card used for 'what do I need to submit?' questions."""
     lines = ["**Final teslim için gerekenler**"]
     lines.extend(f"- {line}" for line in SUBMISSION_RULE_LINES)
+    return "\n".join(lines)
+
+
+def format_channel_rules() -> str:
+    """Canonical answer for 'is WhatsApp enough?' channel questions."""
+    lines = ["**WhatsApp teslim veya düzeltme yerine geçmez**"]
+    lines.extend(f"- {line}" for line in CHANNEL_RULE_LINES)
     return "\n".join(lines)
 
 
@@ -430,6 +472,12 @@ _MODE_HINTS: tuple[tuple[AssistantMode, tuple[str, ...]], ...] = (
             "teslim durumu",
             "tesliminde",
             "final teslim",
+            "ne koymam",
+            "github'a ne",
+            "github’a ne",
+            "yazmam yeterli",
+            "whatsapp'tan",
+            "whatsapp’tan",
         ),
     ),
     (
