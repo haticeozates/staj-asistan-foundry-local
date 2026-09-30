@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,7 @@ from staj_asistan.models import (
     Citation,
     EvidenceLevel,
 )
+from staj_asistan.privacy import DEFAULT_POLICY
 from staj_asistan.telegram import (
     TelegramDeliveryRejected,
     TelegramDeliveryUncertain,
@@ -551,18 +553,163 @@ def test_offset_advances_past_ignored_and_accepted_updates(queue, assistant):
     )
 
     created = poller.poll_once(timeout=0)
-    poller.poll_once(timeout=0)
-
     assert created == 1
     assert poller.offset == 7
+
+    poller.poll_once(timeout=0)
     assert transport.offsets == [None, 7]
 
 
-def test_offset_never_moves_backwards(poller):
+def test_offset_follows_latest_observed_update_not_highest(poller):
     poller.process_update(text_update(update_id=20, chat_id=999))
     poller.process_update(text_update(update_id=3, chat_id=999))
 
-    assert poller.offset == 21
+    assert poller.offset == 4
+
+
+def test_renumbered_low_update_after_high_update_is_queued(poller, assistant):
+    high = poller.process_update(text_update(update_id=900_000, message_id=1))
+    low = poller.process_update(text_update(update_id=12, message_id=2))
+
+    assert high is not None and low is not None and high != low
+    assert [item.update_id for item in poller.queue.list_items()] == [900_000, 12]
+    assert len(assistant.questions) == 2
+    assert poller.offset == 13
+
+
+def test_empty_poll_resynchronises_so_renumbered_updates_are_fetched(queue, assistant):
+    transport = FakeTransport(
+        updates=[
+            [text_update(update_id=900_000, message_id=1)],
+            [],
+            [text_update(update_id=12, message_id=2)],
+            [],
+        ]
+    )
+    poller = TelegramPoller(
+        queue=queue, transport=transport, assistant=assistant, allowed_chat_ids={ALLOWED_CHAT}
+    )
+
+    for _ in range(4):
+        poller.poll_once(timeout=0)
+
+    # The empty response confirmed 900_000; the next request must not carry the stale
+    # high offset, which would silently confirm (discard) renumbered lower update IDs.
+    assert transport.offsets == [None, 900_001, None, 13]
+    assert sorted(item.update_id for item in queue.list_items()) == [12, 900_000]
+    assert len(assistant.questions) == 2
+
+
+def test_resync_redelivery_is_not_retriaged(queue, assistant):
+    update = text_update(update_id=50, message_id=5)
+    transport = FakeTransport(updates=[[update], [], [update]])
+    poller = TelegramPoller(
+        queue=queue, transport=transport, assistant=assistant, allowed_chat_ids={ALLOWED_CHAT}
+    )
+
+    for _ in range(3):
+        poller.poll_once(timeout=0)
+
+    assert len(queue.list_items()) == 1
+    assert len(assistant.questions) == 1
+
+
+def test_long_gap_between_polls_drops_stale_offset(queue, assistant):
+    now = {"t": 0.0}
+    transport = FakeTransport(
+        updates=[[text_update(update_id=900_000, message_id=1)], [text_update(update_id=7)]]
+    )
+    poller = TelegramPoller(
+        queue=queue,
+        transport=transport,
+        assistant=assistant,
+        allowed_chat_ids={ALLOWED_CHAT},
+        resync_after_seconds=60,
+        clock=lambda: now["t"],
+    )
+
+    poller.poll_once(timeout=0)
+    now["t"] = 61.0
+    poller.poll_once(timeout=0)
+
+    assert transport.offsets == [None, None]
+    assert sorted(item.update_id for item in queue.list_items()) == [7, 900_000]
+
+
+def test_colliding_renumbered_update_id_is_not_mistaken_for_duplicate(poller, caplog):
+    first = poller.process_update(text_update(update_id=12, message_id=1))
+
+    with caplog.at_level(logging.WARNING, logger="staj_asistan"):
+        second = poller.process_update(text_update(update_id=12, message_id=2, text="yeni"))
+
+    assert second is None
+    assert first is not None
+    assert len(poller.queue.list_items()) == 1
+    assert "collision" in caplog.text
+    assert "yeni" not in caplog.text
+    assert str(ALLOWED_CHAT) not in caplog.text
+
+
+# --------------------------------------------------------------------------------------
+# Privacy fail-closed
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "disabled",
+    [
+        "pseudonymize_senders",
+        "mask_emails",
+        "mask_phones",
+        "mask_private_urls",
+        "mask_handles",
+        "mask_roster_lines",
+    ],
+)
+def test_poller_rejects_policy_with_disabled_privacy_control(
+    queue, fake_transport, assistant, disabled
+):
+    policy = replace(DEFAULT_POLICY, **{disabled: False})
+
+    with pytest.raises(ValueError, match="privacy"):
+        TelegramPoller(
+            queue=queue,
+            transport=fake_transport,
+            assistant=assistant,
+            allowed_chat_ids={ALLOWED_CHAT},
+            policy=policy,
+        )
+
+    assert fake_transport.offsets == []
+
+
+def test_only_masked_values_reach_triage_and_persistence(queue, fake_transport, assistant, db_path):
+    seen: list[IncomingMessage] = []
+
+    def spy(message, assistant_):
+        seen.append(message)
+        return triage(message, assistant_)
+
+    poller = TelegramPoller(
+        queue=queue,
+        transport=fake_transport,
+        assistant=assistant,
+        allowed_chat_ids={ALLOWED_CHAT},
+        triage_fn=spy,
+    )
+    raw = "Ara +90 000 111 22 99, mail real@private.test, link https://1drv.ms/abc @someone_fake"
+    poller.process_update(text_update(text=raw))
+
+    blob = b"".join(
+        path.read_bytes()
+        for path in db_path.parent.iterdir()
+        if path.name.startswith(db_path.name)
+    )
+    for secret in ("000 111 22 99", "real@private", "1drv.ms", "someone_fake"):
+        assert secret not in seen[0].text
+        assert all(secret not in question for question in assistant.questions)
+        assert secret.encode() not in blob
+    assert seen[0].sender_alias.startswith("Katılımcı#")
 
 
 def test_failed_triage_keeps_offset_so_update_is_retried(queue, assistant):

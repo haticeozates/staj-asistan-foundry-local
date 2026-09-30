@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import threading
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -32,12 +33,28 @@ if TYPE_CHECKING:  # pragma: no cover - import only for type checkers
 logger = logging.getLogger(__name__)
 
 _GROUP_CHAT_TYPES = frozenset({"group", "supergroup"})
+_REQUIRED_PRIVACY_CONTROLS = (
+    "pseudonymize_senders",
+    "mask_emails",
+    "mask_phones",
+    "mask_private_urls",
+    "mask_handles",
+    "mask_roster_lines",
+)
 
 TriageFn = Callable[[IncomingMessage, "Assistant"], TriageResult]
 
 
 def _is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _message_key(update: dict[str, Any]) -> tuple[object, object]:
+    message = update.get("message")
+    if not isinstance(message, dict):
+        return (None, None)
+    chat = message.get("chat")
+    return (chat.get("id") if isinstance(chat, dict) else None, message.get("message_id"))
 
 
 @dataclass(frozen=True)
@@ -61,22 +78,39 @@ class TelegramPoller:
         allowed_chat_ids: Iterable[int],
         policy: PrivacyPolicy = DEFAULT_POLICY,
         triage_fn: TriageFn = triage,
+        resync_after_seconds: float = 3600.0,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         allowed = frozenset(allowed_chat_ids)
         if not allowed or not all(_is_int(chat_id) for chat_id in allowed):
             raise ValueError("at least one allowed integer Telegram chat ID is required")
+        disabled = [name for name in _REQUIRED_PRIVACY_CONTROLS if not getattr(policy, name)]
+        if disabled:
+            raise ValueError(
+                "Telegram polling requires every privacy control; disabled: "
+                + ", ".join(disabled)
+            )
         self.queue = queue
         self._transport = transport
         self._assistant = assistant
         self._allowed = allowed
         self._policy = policy
         self._triage = triage_fn
-        self._known = {item.update_id: item.id for item in queue.list_items()}
+        self._resync_after = float(resync_after_seconds)
+        self._clock = clock
+        self._last_poll: float | None = None
+        self._known = {
+            item.update_id: (item.id, item.chat_id, item.message_id)
+            for item in queue.list_items()
+        }
         self.offset: int | None = None
 
     def _advance(self, update_id: int) -> None:
-        if self.offset is None or update_id + 1 > self.offset:
-            self.offset = update_id + 1
+        # Follow the latest observed update, not the highest ever seen: Telegram may
+        # renumber update IDs randomly after a week idle, and an offset above the new
+        # IDs would confirm (discard) them unread. A lower offset only risks a
+        # redelivery, which the known-update map absorbs without re-running triage.
+        self.offset = update_id + 1
 
     def _accept(self, update: dict[str, Any]) -> _Accepted | str:
         message = update.get("message")
@@ -127,9 +161,11 @@ class TelegramPoller:
             logger.debug("Ignored Telegram update without an update_id")
             return None
         if update_id in self._known:
+            item_id, chat_id, message_id = self._known[update_id]
             self._advance(update_id)
-            return self._known[update_id]
-        if self.offset is not None and update_id < self.offset:
+            if _message_key(update) == (chat_id, message_id):
+                return item_id
+            logger.warning("Telegram update %d: update_id collision, not queued", update_id)
             return None
 
         accepted = self._accept(update)
@@ -162,20 +198,33 @@ class TelegramPoller:
             group_label=group_label,
             triage_result=result,
         )
-        self._known[update_id] = item.id
+        self._known[update_id] = (item.id, item.chat_id, item.message_id)
         self._advance(update_id)
+        if (item.chat_id, item.message_id) != (accepted.chat_id, accepted.message_id):
+            logger.warning("Telegram update %d: update_id collision, not queued", update_id)
+            return None
         logger.info("Queued Telegram update %d as item %d", update_id, item.id)
         return item.id
 
     def poll_once(self, timeout: int = 30) -> int:
-        """Fetch one batch of updates and return how many were queued."""
+        """Fetch one batch of updates and return how many were queued.
 
+        Updates are handled in the order Telegram returns them. After an empty
+        response, or when the previous poll is older than ``resync_after_seconds``,
+        the next request carries no offset: everything below the last offset has
+        already been confirmed, so Telegram returns only unconfirmed updates, whatever
+        their (possibly renumbered) IDs.
+        """
+
+        now = self._clock()
+        if self._last_poll is not None and now - self._last_poll > self._resync_after:
+            self.offset = None
         updates = self._transport.get_updates(offset=self.offset, timeout=timeout)
-        ordered = sorted(
-            updates,
-            key=lambda u: u.get("update_id") if _is_int(u.get("update_id")) else -1,
-        )
-        return sum(1 for update in ordered if self.process_update(update) is not None)
+        self._last_poll = now
+        if not updates:
+            self.offset = None
+            return 0
+        return sum(1 for update in updates if self.process_update(update) is not None)
 
     def run_forever(
         self,
