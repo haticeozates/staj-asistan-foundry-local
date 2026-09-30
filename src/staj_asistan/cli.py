@@ -14,9 +14,12 @@ import json
 import sys
 from pathlib import Path
 
+from .corpus import build_private_index
+from .embeddings import resolve_embedding_backend
 from .ingestion import sample_directory
 from .models import AssistantMode
 from .pipeline import Assistant
+from .private_config import PrivateConfig
 
 
 def _build_assistant(data_dir: str | None) -> Assistant:
@@ -76,7 +79,34 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser("stats", help="Show index statistics")
 
+    corpus = subparsers.add_parser("corpus", help="Manage a persistent private corpus")
+    corpus_commands = corpus.add_subparsers(dest="corpus_command", required=True)
+    corpus_build = corpus_commands.add_parser("build", help="Build a masked private index")
+    corpus_build.add_argument("--config", type=Path, required=True)
+    corpus_build.add_argument("--output", type=Path, required=True)
+    corpus_build.add_argument("--embedding-backend", default="auto")
+    corpus_build.add_argument("--allow-hashing", action="store_true")
+    corpus_build.add_argument("inputs", nargs="+", type=Path, metavar="INPUT")
+
     args = parser.parse_args(argv)
+    if args.command == "corpus":
+        config = PrivateConfig.load(args.config)
+        backend = resolve_embedding_backend(args.embedding_backend)
+        manifest = build_private_index(
+            config,
+            args.inputs,
+            args.output,
+            backend,
+            allow_hashing=args.allow_hashing,
+        )
+        print(
+            f"Index built: {manifest.source_count} sources, "
+            f"{manifest.message_count} messages, {manifest.chunk_count} chunks"
+        )
+        print(f"Instructor messages: {manifest.instructor_message_count}")
+        print(f"Privacy scan: {'clean' if manifest.privacy_scan_clean else 'failed'}")
+        return 0
+
     assistant = _build_assistant(args.data)
 
     if args.command == "stats":
