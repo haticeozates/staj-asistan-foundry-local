@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 
 
 def _private_index_path(value: object, field_name: str) -> Path:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a path under data/index")
     path = Path(value)
-    if path.is_absolute() or ".." in path.parts or path.parts[:2] != ("data", "index"):
+    if (
+        path.is_absolute()
+        or ".." in path.parts
+        or path.parts[:2] != ("data", "index")
+        or len(path.parts) == 2
+    ):
         raise ValueError(f"{field_name} must be a path under data/index")
     return path
 
@@ -22,9 +29,12 @@ class PrivateConfig:
 
     instructor_aliases: tuple[str, ...]
     allowed_telegram_chat_ids: frozenset[int] = frozenset()
-    source_labels: dict[str, str] = field(default_factory=dict)
+    source_labels: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
     index_dir: Path = Path("data/index/private")
     queue_db: Path = Path("data/index/telegram-queue.sqlite3")
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "source_labels", MappingProxyType(dict(self.source_labels)))
 
     @classmethod
     def load(cls, path: Path) -> PrivateConfig:
@@ -63,7 +73,9 @@ class PrivateConfig:
         return cls(
             instructor_aliases=tuple(alias.strip() for alias in aliases),
             allowed_telegram_chat_ids=frozenset(chat_ids),
-            source_labels={key: label.strip() for key, label in source_labels.items()},
+            source_labels=MappingProxyType(
+                {key: label.strip() for key, label in source_labels.items()}
+            ),
             index_dir=_private_index_path(
                 payload.get("index_dir", "data/index/private"), "index_dir"
             ),

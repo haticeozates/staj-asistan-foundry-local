@@ -83,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     corpus_commands = corpus.add_subparsers(dest="corpus_command", required=True)
     corpus_build = corpus_commands.add_parser("build", help="Build a masked private index")
     corpus_build.add_argument("--config", type=Path, required=True)
-    corpus_build.add_argument("--output", type=Path, required=True)
+    corpus_build.add_argument("--output", type=Path)
     corpus_build.add_argument("--embedding-backend", default="auto")
     corpus_build.add_argument("--allow-hashing", action="store_true")
     corpus_build.add_argument("inputs", nargs="+", type=Path, metavar="INPUT")
@@ -95,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         manifest = build_private_index(
             config,
             args.inputs,
-            args.output,
+            args.output or config.index_dir,
             backend,
             allow_hashing=args.allow_hashing,
         )

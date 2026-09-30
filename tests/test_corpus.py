@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import staj_asistan.corpus as corpus_module
 from staj_asistan.cli import main
 from staj_asistan.corpus import build_private_index, load_private_assistant
 from staj_asistan.embeddings import HashingEmbeddings
@@ -17,6 +18,12 @@ SYNTHETIC_ALIAS = "Örnek Eğitmen"
 SYNTHETIC_EXPORT = """[30.09.2026 10:00:00] Örnek Eğitmen: Teslim için repo bağlantısı gereklidir.
 [30.09.2026 10:01:00] Örnek Katılımcı: Bana fake.person@invalid.test adresinden ulaşın.
 """
+INDEX_DIR = Path("data/index/private")
+
+
+@pytest.fixture(autouse=True)
+def isolated_working_directory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
 
 
 @pytest.fixture
@@ -45,7 +52,7 @@ def build_fixture_index(tmp_path: Path, hashing_backend: HashingEmbeddings):
     return build_private_index(
         config,
         [source],
-        tmp_path / "index",
+        INDEX_DIR,
         hashing_backend,
         allow_hashing=True,
     )
@@ -69,6 +76,7 @@ def test_private_config_rejects_non_integer_chat_ids(tmp_path, chat_ids):
     [
         ("index_dir", "../private-index"),
         ("queue_db", "/tmp/private-queue.sqlite3"),
+        ("index_dir", "data/index"),
     ],
 )
 def test_private_config_rejects_paths_outside_data_index(tmp_path, field, unsafe_path):
@@ -85,18 +93,19 @@ def test_private_config_errors_do_not_expose_values(tmp_path):
 
 def test_manifest_contains_no_raw_path_alias_or_secret(tmp_path, hashing_backend):
     manifest = build_fixture_index(tmp_path, hashing_backend)
-    blob = (tmp_path / "index" / "manifest.json").read_text(encoding="utf-8")
+    blob = (INDEX_DIR / "manifest.json").read_text(encoding="utf-8")
     assert "/Users/" not in blob
     assert SYNTHETIC_ALIAS not in blob
     assert "token" not in blob.lower()
     assert "synthetic-chat.txt" not in blob
+    assert manifest.embedding_description == hashing_backend.description
     assert manifest.source_labels == ("Sentetik Grup",)
     assert manifest.privacy_scan_clean is True
 
 
 def test_saved_index_round_trips(tmp_path, hashing_backend):
     manifest = build_fixture_index(tmp_path, hashing_backend)
-    assistant = load_private_assistant(tmp_path / "index", llm=ExtractiveClient())
+    assistant = load_private_assistant(INDEX_DIR, llm=ExtractiveClient())
     assert assistant.stats.chunk_count == manifest.chunk_count
     assert assistant.stats.message_count == manifest.message_count
     assert assistant.stats.instructor_message_count == manifest.instructor_message_count
@@ -115,7 +124,7 @@ def test_identical_inputs_are_deduplicated(tmp_path, hashing_backend):
     manifest = build_private_index(
         config,
         [first, second],
-        tmp_path / "index",
+        INDEX_DIR,
         hashing_backend,
         allow_hashing=True,
     )
@@ -131,7 +140,62 @@ def test_hashing_backend_requires_explicit_opt_in(tmp_path, hashing_backend):
     source.write_text(SYNTHETIC_EXPORT, encoding="utf-8")
 
     with pytest.raises(ValueError, match="allow_hashing"):
-        build_private_index(config, [source], tmp_path / "index", hashing_backend)
+        build_private_index(config, [source], INDEX_DIR, hashing_backend)
+
+
+def test_build_rejects_output_outside_data_index(tmp_path, hashing_backend):
+    config = write_config(tmp_path)
+    source = tmp_path / "synthetic-chat.txt"
+    source.write_text(SYNTHETIC_EXPORT, encoding="utf-8")
+    output = tmp_path / "outside-index"
+
+    with pytest.raises(ValueError, match="data/index"):
+        build_private_index(config, [source], output, hashing_backend, allow_hashing=True)
+
+    assert not output.exists()
+
+
+def test_source_labels_are_immutable(tmp_path):
+    config = write_config(tmp_path)
+
+    with pytest.raises(TypeError):
+        config.source_labels["new.txt"] = "Yeni"
+
+    directly_constructed = PrivateConfig(
+        instructor_aliases=(SYNTHETIC_ALIAS,),
+        source_labels={"synthetic-chat.txt": "Sentetik Grup"},
+    )
+    with pytest.raises(TypeError):
+        directly_constructed.source_labels["new.txt"] = "Yeni"
+
+
+def test_unsafe_source_label_aborts_without_output(tmp_path, hashing_backend):
+    config = write_config(
+        tmp_path,
+        source_labels={"synthetic-chat.txt": "private.person@example.dev"},
+    )
+    source = tmp_path / "synthetic-chat.txt"
+    source.write_text(SYNTHETIC_EXPORT, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="privacy"):
+        build_private_index(config, [source], INDEX_DIR, hashing_backend, allow_hashing=True)
+
+    assert not INDEX_DIR.exists()
+
+
+def test_unsafe_message_body_aborts_without_output(tmp_path, hashing_backend):
+    config = write_config(tmp_path)
+    source = tmp_path / "synthetic-chat.txt"
+    source.write_text(
+        "[30.09.2026 10:00:00] Örnek Eğitmen: "
+        "Bu mesaj Örnek Eğitmen özel adını içeriyor.",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="privacy"):
+        build_private_index(config, [source], INDEX_DIR, hashing_backend, allow_hashing=True)
+
+    assert not INDEX_DIR.exists()
 
 
 def test_build_does_not_resolve_an_unneeded_llm(tmp_path, hashing_backend, monkeypatch):
@@ -147,7 +211,7 @@ def test_build_does_not_resolve_an_unneeded_llm(tmp_path, hashing_backend, monke
     build_private_index(
         config,
         [source],
-        tmp_path / "index",
+        INDEX_DIR,
         hashing_backend,
         allow_hashing=True,
     )
@@ -165,7 +229,7 @@ def test_build_requires_an_instructor_chunk(tmp_path, hashing_backend):
         build_private_index(
             config,
             [source],
-            tmp_path / "index",
+            INDEX_DIR,
             hashing_backend,
             allow_hashing=True,
         )
@@ -179,14 +243,100 @@ def test_load_rejects_embedding_dimension_mismatch(tmp_path, hashing_backend, mo
     )
 
     with pytest.raises(ValueError, match="dimension"):
-        load_private_assistant(tmp_path / "index", llm=ExtractiveClient())
+        load_private_assistant(INDEX_DIR, llm=ExtractiveClient())
+
+
+def rewrite_manifest(**changes):
+    path = INDEX_DIR / "manifest.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.update(changes)
+    path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+
+def test_load_rejects_manifest_schema_mismatch(tmp_path, hashing_backend):
+    build_fixture_index(tmp_path, hashing_backend)
+    rewrite_manifest(schema_version=999)
+
+    with pytest.raises(ValueError, match="schema"):
+        load_private_assistant(INDEX_DIR, llm=ExtractiveClient())
+
+
+def test_load_rejects_manifest_chunk_count_mismatch(tmp_path, hashing_backend):
+    manifest = build_fixture_index(tmp_path, hashing_backend)
+    rewrite_manifest(chunk_count=manifest.chunk_count + 1)
+
+    with pytest.raises(ValueError, match="chunk count"):
+        load_private_assistant(INDEX_DIR, llm=ExtractiveClient())
+
+
+def test_load_rejects_manifest_backend_mismatch(tmp_path, hashing_backend, monkeypatch):
+    build_fixture_index(tmp_path, hashing_backend)
+    rewrite_manifest(embedding_backend="different-backend")
+    monkeypatch.setattr(
+        "staj_asistan.corpus.resolve_embedding_backend",
+        lambda _name: HashingEmbeddings(),
+    )
+
+    with pytest.raises(ValueError, match="backend"):
+        load_private_assistant(INDEX_DIR, llm=ExtractiveClient())
+
+
+def test_load_rejects_embedding_description_mismatch(tmp_path, hashing_backend):
+    build_fixture_index(tmp_path, hashing_backend)
+    rewrite_manifest(embedding_description="hashing:changed-configuration")
+
+    with pytest.raises(ValueError, match="description"):
+        load_private_assistant(INDEX_DIR, llm=ExtractiveClient())
+
+
+def test_loaded_stats_clear_after_add_and_reset(tmp_path, hashing_backend):
+    manifest = build_fixture_index(tmp_path, hashing_backend)
+    assistant = load_private_assistant(INDEX_DIR, llm=ExtractiveClient())
+
+    assistant.ingest_text("Yeni sentetik belge içeriği.", "Yeni Kaynak")
+    assert assistant.stats.chunk_count > manifest.chunk_count
+
+    assistant.reset()
+    assert assistant.stats.chunk_count == 0
+
+
+def test_non_numpy_store_is_rejected_before_embedding_work(tmp_path, hashing_backend, monkeypatch):
+    config = write_config(tmp_path)
+    source = tmp_path / "synthetic-chat.txt"
+    source.write_text(SYNTHETIC_EXPORT, encoding="utf-8")
+
+    class NonNumpyAssistant:
+        store = object()
+
+        def add_sources(self, _sources):
+            raise AssertionError("embedding work started")
+
+    monkeypatch.setattr(corpus_module, "Assistant", lambda **_kwargs: NonNumpyAssistant())
+
+    with pytest.raises(ValueError, match="numpy"):
+        build_private_index(config, [source], INDEX_DIR, hashing_backend, allow_hashing=True)
+
+
+def test_backup_cleanup_failure_does_not_fail_build(tmp_path, hashing_backend, monkeypatch):
+    build_fixture_index(tmp_path, hashing_backend)
+    real_rmtree = corpus_module.shutil.rmtree
+
+    def fail_for_backup(path):
+        if ".backup-" in Path(path).name:
+            raise OSError("synthetic cleanup failure")
+        real_rmtree(path)
+
+    monkeypatch.setattr(corpus_module.shutil, "rmtree", fail_for_backup)
+
+    manifest = build_fixture_index(tmp_path, hashing_backend)
+    assert manifest.chunk_count > 0
+    assert (INDEX_DIR / "manifest.json").exists()
 
 
 def test_corpus_build_cli_prints_aggregate_counts_only(tmp_path, hashing_backend, capsys):
     write_config(tmp_path)
     source = tmp_path / "synthetic-chat.txt"
     source.write_text(SYNTHETIC_EXPORT, encoding="utf-8")
-    output = tmp_path / "index"
 
     result = main(
         [
@@ -194,8 +344,6 @@ def test_corpus_build_cli_prints_aggregate_counts_only(tmp_path, hashing_backend
             "build",
             "--config",
             str(tmp_path / "config.json"),
-            "--output",
-            str(output),
             "--embedding-backend",
             "hashing",
             "--allow-hashing",
@@ -210,3 +358,4 @@ def test_corpus_build_cli_prints_aggregate_counts_only(tmp_path, hashing_backend
     assert "Privacy scan: clean" in printed
     assert SYNTHETIC_ALIAS not in printed
     assert str(source) not in printed
+    assert (INDEX_DIR / "manifest.json").exists()

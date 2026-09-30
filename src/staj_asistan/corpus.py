@@ -25,6 +25,7 @@ from .whatsapp_parser import InstructorIdentity
 class CorpusManifest:
     schema_version: int
     embedding_backend: str
+    embedding_description: str
     embedding_dimension: int
     source_count: int
     message_count: int
@@ -57,6 +58,18 @@ def _safe_label(config: PrivateConfig, input_path: Path, position: int) -> str:
     ):
         raise ValueError("source label failed the privacy scan")
     return label
+
+
+def _validated_output_dir(output_dir: Path) -> Path:
+    index_root = Path("data/index").resolve()
+    resolved = Path(output_dir).resolve()
+    try:
+        relative = resolved.relative_to(index_root)
+    except ValueError as exc:
+        raise ValueError("corpus output must be under data/index") from exc
+    if not relative.parts:
+        raise ValueError("corpus output must be below data/index")
+    return resolved
 
 
 def _sanitise_sources(sources: list[IngestedSource], base_label: str) -> list[IngestedSource]:
@@ -105,7 +118,10 @@ def _write_index_atomically(
             output_dir.replace(backup)
         temporary.replace(output_dir)
         if backup is not None:
-            shutil.rmtree(backup)
+            try:
+                shutil.rmtree(backup)
+            except OSError:
+                pass
     except Exception:
         if backup is not None and backup.exists() and not output_dir.exists():
             backup.replace(output_dir)
@@ -123,6 +139,7 @@ def build_private_index(
     allow_hashing: bool = False,
 ) -> CorpusManifest:
     """Ingest, mask and atomically persist a deduplicated private corpus."""
+    output_path = _validated_output_dir(output_dir)
     if embedding_backend.name == "hashing" and not allow_hashing:
         raise ValueError("hashing embeddings require allow_hashing=True")
 
@@ -132,6 +149,8 @@ def build_private_index(
         llm=ExtractiveClient(),
         instructor=instructor,
     )
+    if not isinstance(assistant.store, NumpyVectorStore):
+        raise ValueError("private corpus persistence requires the numpy vector store")
     input_hashes: list[str] = []
     source_labels: list[str] = []
     seen_hashes: set[str] = set()
@@ -162,6 +181,7 @@ def build_private_index(
     manifest = CorpusManifest(
         schema_version=1,
         embedding_backend=embedding_backend.name,
+        embedding_description=embedding_backend.description,
         embedding_dimension=embedding_backend.dimension,
         source_count=stats.file_count,
         message_count=stats.message_count,
@@ -172,9 +192,7 @@ def build_private_index(
         input_hashes=tuple(input_hashes),
         privacy_scan_clean=privacy_scan_clean,
     )
-    if not isinstance(assistant.store, NumpyVectorStore):
-        raise ValueError("private corpus persistence requires the numpy vector store")
-    _write_index_atomically(Path(output_dir), assistant.store, manifest)
+    _write_index_atomically(output_path, assistant.store, manifest)
     return manifest
 
 
@@ -187,6 +205,8 @@ def load_private_assistant(index_dir: Path, llm: LLMClient | None = None) -> Ass
         raise ValueError("saved embedding backend does not match the resolved backend")
     if backend.dimension != manifest.embedding_dimension:
         raise ValueError("saved embedding dimension does not match the resolved backend")
+    if backend.description != manifest.embedding_description:
+        raise ValueError("saved embedding description does not match the resolved backend")
 
     store = NumpyVectorStore.load(index_path)
     vectors = store.vectors()

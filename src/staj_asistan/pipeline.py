@@ -106,6 +106,7 @@ class Assistant:
             self.store.add(chunks, vectors)
             self.retriever.invalidate()
         self._sources.append(source)
+        self._persisted_stats = None
         return len(chunks)
 
     def add_sources(self, sources: list[IngestedSource]) -> int:
@@ -130,6 +131,7 @@ class Assistant:
         self.store.clear()
         self.retriever.invalidate()
         self._sources = []
+        self._persisted_stats = None
 
     @property
     def stats(self) -> IndexStats:
