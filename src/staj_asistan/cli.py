@@ -11,12 +11,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import signal
 import sys
+import threading
 from pathlib import Path
 
+from .approval_queue import ApprovalQueue
+from .corpus import build_private_index, load_private_assistant
+from .embeddings import resolve_embedding_backend
 from .ingestion import sample_directory
 from .models import AssistantMode
 from .pipeline import Assistant
+from .private_config import PrivateConfig
+from .telegram import TelegramError, TelegramHTTPTransport
+from .telegram_worker import TelegramPoller
 
 
 def _build_assistant(data_dir: str | None) -> Assistant:
@@ -60,6 +69,45 @@ def _print_answer(answer, as_json: bool) -> None:
     print(f"\nKanıt düzeyi: {answer.evidence.value} · Üretim: {answer.generator}")
 
 
+def _run_telegram_poll(config_path: Path) -> int:
+    """Long-poll allowlisted Telegram groups into the local approval queue."""
+    try:
+        config = PrivateConfig.load(config_path)
+    except ValueError:
+        print("private configuration could not be loaded", file=sys.stderr)
+        return 2
+    if not config.allowed_telegram_chat_ids:
+        print("allowed Telegram chat IDs are required", file=sys.stderr)
+        return 2
+    try:
+        transport = TelegramHTTPTransport.from_env()
+    except TelegramError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    try:
+        assistant = load_private_assistant(config.index_dir)
+    except (OSError, ValueError):
+        print("private index could not be loaded", file=sys.stderr)
+        return 2
+
+    poller = TelegramPoller(
+        queue=ApprovalQueue(config.queue_db),
+        transport=transport,
+        assistant=assistant,
+        allowed_chat_ids=config.allowed_telegram_chat_ids,
+    )
+    stop = threading.Event()
+
+    def _request_stop(*_args: object) -> None:
+        stop.set()
+
+    signal.signal(signal.SIGINT, _request_stop)
+    signal.signal(signal.SIGTERM, _request_stop)
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    poller.run_forever(stop)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="staj-asistan", description="StajAsistan 2.0 CLI")
     parser.add_argument("--data", help="Indexed directory (defaults to data/samples)")
@@ -76,7 +124,43 @@ def main(argv: list[str] | None = None) -> int:
 
     subparsers.add_parser("stats", help="Show index statistics")
 
+    corpus = subparsers.add_parser("corpus", help="Manage a persistent private corpus")
+    corpus_commands = corpus.add_subparsers(dest="corpus_command", required=True)
+    corpus_build = corpus_commands.add_parser("build", help="Build a masked private index")
+    corpus_build.add_argument("--config", type=Path, required=True)
+    corpus_build.add_argument("--output", type=Path)
+    corpus_build.add_argument("--embedding-backend", default="auto")
+    corpus_build.add_argument("--allow-hashing", action="store_true")
+    corpus_build.add_argument("inputs", nargs="+", type=Path, metavar="INPUT")
+
+    telegram = subparsers.add_parser("telegram", help="Run the local Telegram operations worker")
+    telegram_commands = telegram.add_subparsers(dest="telegram_command", required=True)
+    telegram_poll = telegram_commands.add_parser(
+        "poll", help="Long-poll allowlisted groups into the approval queue"
+    )
+    telegram_poll.add_argument("--config", type=Path, required=True)
+
     args = parser.parse_args(argv)
+    if args.command == "telegram":
+        return _run_telegram_poll(args.config)
+    if args.command == "corpus":
+        config = PrivateConfig.load(args.config)
+        backend = resolve_embedding_backend(args.embedding_backend)
+        manifest = build_private_index(
+            config,
+            args.inputs,
+            args.output or config.index_dir,
+            backend,
+            allow_hashing=args.allow_hashing,
+        )
+        print(
+            f"Index built: {manifest.source_count} sources, "
+            f"{manifest.message_count} messages, {manifest.chunk_count} chunks"
+        )
+        print(f"Instructor messages: {manifest.instructor_message_count}")
+        print(f"Privacy scan: {'clean' if manifest.privacy_scan_clean else 'failed'}")
+        return 0
+
     assistant = _build_assistant(args.data)
 
     if args.command == "stats":

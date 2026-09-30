@@ -6,7 +6,9 @@ and **Microsoft Foundry Local**, for the Microsoft AI Innovators Summer Internsh
 It does two things: it answers questions from the programme's own message archive, and it triages
 messages arriving in the programme's groups — classifying each one, drafting a reply from the
 sources, and deciding whether that draft may be used as-is or has to go to a human first.
-**It never sends anything.** Auto-send is not unimplemented; it is excluded by design.
+**It never auto-sends.** The sample-data demo has no send path. The optional Telegram operations
+pilot can post a reply only after a human ticks a confirmation box and clicks a labelled send
+button. Auto-send is not unimplemented; it is excluded by design.
 
 Project track: *Building Your First Local RAG Application with Foundry Local*.
 
@@ -48,27 +50,30 @@ cover the question.
 
 Answers are in Turkish, because the participants are.
 
-### Triage: incoming message simulation
+### Triage: incoming messages
 
 The four modes above assume somebody already decided which mode to open. In a real group nobody
-does that — a message just arrives. The **Gelen Mesaj Simülasyonu** view models that: paste a
-message as it would land in a group, and the assistant classifies the intent, picks the mode
-itself, drafts an answer from the sources, and returns one of three decisions.
+does that — a message just arrives. Two surfaces cover that:
+
+- **Gelen Mesaj Simülasyonu** — paste a message by hand. This is the demo and the test harness.
+- **Onay Kuyruğu** — the Telegram operations pilot. A local poller reads allowlisted group
+  messages, the same triage runs, and drafts wait for an explicit human send. See
+  [`docs/telegram_pilot.md`](docs/telegram_pilot.md).
 
 | Decision | Meaning |
 | --- | --- |
-| **Draft reply** | The archive answers this with citations. A human copies the draft out. |
+| **Draft reply** | The archive answers this with citations. A human copies it, or (in the pilot) may send it after confirmation. |
 | **Needs human approval** | A draft exists, but the topic or the evidence means a person must read it first |
-| **Do not answer** | The sources do not support an answer. No draft is produced at all. |
+| **Do not answer** | The sources do not support an answer. No draft is produced, and the item cannot be sent. |
 
 A draft is escalated rather than handed over when the message is a roster correction, when it
 touches a certificate, deadline or official document, when it carries personal data, or when the
-answer rests on a rule card that retrieval only weakly corroborates. Everything else with solid
-evidence becomes a copyable draft.
+answer rests on a rule card that retrieval only weakly corroborates.
 
-There is **no send button and no outbound adapter anywhere in the codebase**, and a test enforces
-that. The channel field (`whatsapp` / `telegram` / `manual`) is display and audit metadata only:
-nothing reads a credential, opens a socket or contacts a messaging provider.
+Triage itself still has no send decision: `as_dict()` always includes `auto_send: False`, and the
+channel field (`whatsapp` / `telegram` / `manual`) does not change the answer. The only outbound
+path is `ApprovalService`, reached from the labelled send button after a confirmation tick. The
+poller never calls `sendMessage`.
 
 ## Why local RAG?
 
@@ -203,9 +208,10 @@ Repository hygiene:
 - Images are ignored everywhere except `screenshots/`, which may only hold captures of the app
   running on sample data — a chat screenshot would leak the very data the pipeline strips.
 
-**Verified on the real corpus:** three exports, 2,108 messages after cleanup (543 from the
-instructor), **3,215 personal data items masked, zero leaks** — no e-mail address, phone number or
-raw sender name survived into the index.
+**Verified on the real corpus:** six local exports, 2,150 messages after cleanup (549 from the
+instructor), 1,004 chunks, privacy scan clean. The committed sample-data masking table below is
+from the three historical exports (2,108 messages): **3,215 personal data items masked, zero
+leaks** — no e-mail address, phone number or raw sender name survived into the index.
 
 | Masked | Count |
 | --- | --- |
@@ -282,12 +288,18 @@ staj-asistan ask "Final tesliminde ne gerekiyor?"
 staj-asistan ask "GitHub repo hazır ama video çekmedim" --mode submission_checklist
 staj-asistan ask "Listede projem yanlış" --mode correction_analyzer --json
 staj-asistan stats
+staj-asistan corpus build --config data/private/config.json --embedding-backend sentence-transformers INPUT...
+staj-asistan telegram poll --config data/private/config.json
 ```
+
+Telegram operations (private config, persistent index, approval queue, approve-then-send):
+[`docs/telegram_pilot.md`](docs/telegram_pilot.md). Copy `.env.example` locally; never commit a
+real token, alias or chat ID.
 
 ## Test
 
 ```bash
-pytest                    # 298 passed, 18 skipped, ~2 seconds, fully offline
+pytest                    # 419 passed, 18 skipped, ~5 seconds, fully offline
 ```
 
 Tests that load a real embedding model are opt-in, so the default run stays fast:
@@ -306,7 +318,10 @@ What is covered:
 | Retrieval | correct source retrieved, instructor beats participant guess, refusal path, MMR, persistence |
 | Workflows | Turkish negation handling, checklist completeness, correction schema, identity gaps |
 | Pipeline | the four demo scenarios end-to-end, no-sources-no-model-call contract, invalid citation stripping |
-| Triage | intent classification, every branch of the reply policy, and the no-send guarantee: no outbound decision, no sending callable, no messaging endpoint or credential in any module, no send button in the UI |
+| Triage | intent classification, every branch of the reply policy, and the no-auto-send guarantee on the triage result |
+| Telegram pilot | token redaction, long-poll offset handling, allowlist, DO_NOT_ANSWER cannot send, atomic claim, rejected vs uncertain delivery |
+| Approval UI | confirmation tick required, token loaded only on the send click, refusals have no send control |
+| Private corpus | instructor-alias requirement, path confinement under `data/index`, privacy scan, hashing opt-in |
 | UI | the simulator view rendered headlessly — the standing warning, a copyable draft on success, and no draft block at all on refusal |
 
 ## Demo questions
@@ -365,11 +380,9 @@ Stated plainly, because knowing where a system is weak is part of shipping it:
   are not stored in this repository.
 - **Retrieval thresholds are calibrated on this corpus** and would need re-measuring on a very
   different one.
-- **Triage is a simulation, not an integration.** Messages are pasted in by hand. There is no
-  WhatsApp or Telegram connection, and the channel field changes nothing about how a message is
-  handled — it is a label. Connecting a real group is future work, and deliberately so: the
-  official WhatsApp Business API needs a reviewed business account, and the unofficial route means
-  automating WhatsApp Web, which violates the terms of service and would put a live group at risk.
+- **WhatsApp cannot host this pilot.** The official Groups API is limited to API-created invite
+  groups with an eight-participant cap. Automating WhatsApp Web is out of scope. Telegram's Bot
+  API is the supported operations path, behind a local allowlist and a human send click.
 
 ## Future work
 
@@ -380,15 +393,10 @@ Stated plainly, because knowing where a system is weak is part of shipping it:
 - Conversational memory with query rewriting for follow-up questions.
 - An evaluation harness with a labelled question set, so retrieval changes can be measured rather
   than eyeballed.
-- **A read-only webhook adapter** for a channel that permits one — Telegram's Bot API is the
-  realistic candidate, since it is official and does not require a business review. It would feed
-  `IncomingMessage` from a webhook payload instead of a text box. The triage boundary is already
-  shaped for it: `triage()` takes a message object and returns a decision, and knows nothing about
-  where the message came from.
-- **An approval queue** so escalated drafts land somewhere an instructor can review them, rather
-  than on the screen of whoever ran the simulation.
-- Even with an adapter, sending stays manual. The step that puts text in front of 500 people is the
-  one worth keeping a human on.
+- A public webhook deployment of the same poller, if a later phase needs a machine that is not
+  always on.
+- Even with Telegram connected, sending stays manual. The step that puts text in front of a live
+  group is the one worth keeping a human on.
 
 ## What I learned
 

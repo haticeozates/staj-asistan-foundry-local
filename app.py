@@ -5,6 +5,7 @@ Run with:  streamlit run app.py
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -12,8 +13,13 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 
+from staj_asistan.approval_queue import ApprovalQueue  # noqa: E402
+from staj_asistan.approval_ui import VIEW_TITLE as VIEW_QUEUE  # noqa: E402
+from staj_asistan.approval_ui import render_approval_view  # noqa: E402
+from staj_asistan.corpus import load_private_assistant  # noqa: E402
 from staj_asistan.models import AssistantMode, EvidenceLevel  # noqa: E402
 from staj_asistan.pipeline import Assistant  # noqa: E402
+from staj_asistan.private_config import PrivateConfig  # noqa: E402
 from staj_asistan.triage import (  # noqa: E402
     Channel,
     IncomingMessage,
@@ -26,6 +32,14 @@ from staj_asistan.triage import (  # noqa: E402
 # existing modes for you rather than adding a new answering style.
 VIEW_ASSISTANT = "Asistan"
 VIEW_TRIAGE = "Gelen Mesaj Simülasyonu"
+
+# Without this variable the app is the sample-data demo: no private index, no queue,
+# no Telegram. The value is a path and is never displayed.
+PRIVATE_CONFIG_ENV = "STAJ_ASISTAN_PRIVATE_CONFIG"
+PRIVATE_SETUP_ERROR = (
+    "Özel yapılandırma yüklenemedi; örnek veri demosu ile devam ediliyor. "
+    "Gizlilik nedeniyle ayrıntı gösterilmez."
+)
 
 MODE_LABELS: dict[AssistantMode, str] = {
     AssistantMode.INSTRUCTOR_QA: "Eğitmen Soru-Cevap",
@@ -100,11 +114,28 @@ INCOMING_SAMPLES: list[str] = [
 st.set_page_config(page_title="StajAsistan 2.0", page_icon="📘", layout="wide")
 
 
-def get_assistant() -> Assistant:
+def load_private_runtime() -> tuple[Assistant, ApprovalQueue] | None:
+    raw_path = os.getenv(PRIVATE_CONFIG_ENV, "").strip()
+    if not raw_path:
+        return None
+    try:
+        config = PrivateConfig.load(Path(raw_path))
+        assistant = load_private_assistant(config.index_dir)
+        queue = ApprovalQueue(config.queue_db)
+    except Exception:  # noqa: BLE001 - fall back to the demo without echoing private details
+        st.session_state["private_setup_failed"] = True
+        return None
+    return assistant, queue
+
+
+def get_runtime() -> tuple[Assistant, ApprovalQueue | None]:
     if "assistant" not in st.session_state:
         with st.spinner("Yerel modeller ve indeks hazırlanıyor…"):
-            st.session_state.assistant = Assistant()
-    return st.session_state.assistant
+            private = load_private_runtime()
+            assistant, queue = private if private is not None else (Assistant(), None)
+            st.session_state.assistant = assistant
+            st.session_state.approval_queue = queue
+    return st.session_state.assistant, st.session_state.approval_queue
 
 
 def render_sidebar(assistant: Assistant) -> tuple[str, AssistantMode]:
@@ -114,7 +145,7 @@ def render_sidebar(assistant: Assistant) -> tuple[str, AssistantMode]:
 
         view = st.radio(
             "Görünüm",
-            options=[VIEW_ASSISTANT, VIEW_TRIAGE],
+            options=[VIEW_ASSISTANT, VIEW_TRIAGE, VIEW_QUEUE],
             horizontal=True,
         )
 
@@ -163,8 +194,8 @@ def render_sidebar(assistant: Assistant) -> tuple[str, AssistantMode]:
             format_func=lambda m: MODE_LABELS[m],
             label_visibility="collapsed",
             key="mode_choice",
-            disabled=view == VIEW_TRIAGE,
-            help="Simülasyonda mod otomatik seçilir." if view == VIEW_TRIAGE else None,
+            disabled=view != VIEW_ASSISTANT,
+            help="Bu görünümde mod otomatik seçilir." if view != VIEW_ASSISTANT else None,
         )
 
         with st.expander("Çalışma zamanı"):
@@ -337,8 +368,11 @@ def render_assistant_view(assistant: Assistant, mode: AssistantMode) -> None:
 
 
 def main() -> None:
-    assistant = get_assistant()
+    assistant, queue = get_runtime()
     view, mode = render_sidebar(assistant)
+
+    if st.session_state.get("private_setup_failed"):
+        st.error(PRIVATE_SETUP_ERROR)
 
     if assistant.is_empty:
         st.info(
@@ -348,6 +382,8 @@ def main() -> None:
 
     if view == VIEW_TRIAGE:
         render_triage_view(assistant)
+    elif view == VIEW_QUEUE:
+        render_approval_view(queue, intent_labels=INTENT_LABELS, mode_labels=MODE_LABELS)
     else:
         render_assistant_view(assistant, mode)
 

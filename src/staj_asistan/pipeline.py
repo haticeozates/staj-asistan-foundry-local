@@ -83,6 +83,7 @@ class Assistant:
         store: VectorStore | None = None,
         retrieval: RetrievalConfig | None = None,
         instructor: InstructorIdentity = DEFAULT_INSTRUCTOR,
+        persisted_stats: IndexStats | None = None,
     ) -> None:
         self.policy = policy
         self.chunking = chunking
@@ -93,6 +94,7 @@ class Assistant:
         self.retrieval = retrieval or RetrievalConfig.calibrated_for(self.embedding_backend.name)
         self.retriever = Retriever(self.store, self.embedding_backend, self.retrieval)
         self._sources: list[IngestedSource] = []
+        self._persisted_stats = persisted_stats
 
     # ---------------------------------------------------------------- ingestion
 
@@ -104,6 +106,7 @@ class Assistant:
             self.store.add(chunks, vectors)
             self.retriever.invalidate()
         self._sources.append(source)
+        self._persisted_stats = None
         return len(chunks)
 
     def add_sources(self, sources: list[IngestedSource]) -> int:
@@ -128,9 +131,12 @@ class Assistant:
         self.store.clear()
         self.retriever.invalidate()
         self._sources = []
+        self._persisted_stats = None
 
     @property
     def stats(self) -> IndexStats:
+        if self._persisted_stats is not None:
+            return self._persisted_stats
         return IndexStats(
             file_count=len(self._sources),
             message_count=sum(s.message_count for s in self._sources),

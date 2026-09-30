@@ -11,6 +11,8 @@ question ─▶ retrieval (dense + lexical, weighted) ─▶ threshold ─┬─
                                                                 └─ above ─▶ prompt ─▶ model ─▶ answer + citations
 
 incoming message ─▶ triage ─▶ intent ─▶ mode ─▶ (the pipeline above) ─▶ reply decision
+                                                                         │
+Telegram getUpdates ─▶ mask ─▶ triage ─▶ SQLite queue ─▶ human approve ─▶ sendMessage
 ```
 
 The refusal branch is the important one: when nothing clears the threshold, the language model is
@@ -247,12 +249,37 @@ Rules 2 through 4 fire regardless of how strong the evidence is. A confidently-w
 answer is more dangerous than an uncertain one, not less, because the cost of being wrong lands on
 a participant who cannot undo it.
 
-### No outbound path
+### No auto-send, one gated outbound path
 
-There is no fourth decision, no sending function, no messaging endpoint and no credential read
-anywhere in the package, and tests assert each of those. The channel on an `IncomingMessage` is
-metadata: a test triages the same message as WhatsApp, Telegram and manual input and asserts the
-decision and the draft are byte-identical.
+Triage still has no fourth decision. `as_dict()` always includes `auto_send: False`. The channel
+on an `IncomingMessage` is metadata: the same message triaged as WhatsApp, Telegram or manual
+input yields a byte-identical decision and draft.
 
-This is a design position, not a missing feature, so every result reports it: `as_dict()` always
-includes `auto_send: False`.
+Sending lives outside triage, in three modules that did not exist on the demo path:
+
+- `telegram.py` talks to the Bot API. The token comes only from `TELEGRAM_BOT_TOKEN`. Exceptions
+  and logs are redacted. A failed `sendMessage` is classified as rejected (safe to retry) or
+  uncertain (must not retry).
+- `telegram_worker.py` splits inbound and outbound. `TelegramPoller` long-polls, allowlists,
+  masks, triages and enqueues. It never calls `sendMessage`. `ApprovalService` is the only send
+  path: atomic claim, one send, then `sent` / `failed` / locked-`sending`.
+- `approval_ui.py` renders the queue. A transport is constructed only inside the send-button
+  callback, after a confirmation checkbox. `DO_NOT_ANSWER` cannot be claimed.
+
+The sample-data demo loads none of this. Streamlit opens the private index and queue only when
+`STAJ_ASISTAN_PRIVATE_CONFIG` points at a valid local file.
+
+## 12. Persistent private corpus (`corpus.py`, `private_config.py`)
+
+The demo index is rebuilt from `data/samples/` in memory. The operations index is a masked NumPy
+store under `data/index/`, written atomically with a manifest (backend, dimension, counts,
+privacy-scan flag). Input files are SHA-256 deduplicated. Instructor aliases and Telegram chat
+IDs stay in gitignored `data/private/config.json` and never enter the manifest. Hashing embeddings
+require an explicit `--allow-hashing` flag so a private build cannot silently use the test
+backend.
+
+## 13. Two-process operations runtime
+
+The poller and Streamlit share SQLite (WAL) and must not share a process: a Streamlit rerun would
+reset the Telegram offset. Operator steps, BotFather `/setprivacy`, and WhatsApp API limits are
+in [`telegram_pilot.md`](telegram_pilot.md).
