@@ -26,7 +26,9 @@ correction request analyzer, and technical help. Turkish answers, every one with
 
 On top of that, an incoming-message simulator: paste a message as it would arrive in a group, and
 the assistant classifies it, picks the mode itself, drafts a reply, and decides whether that draft
-can be used as-is or has to go to a human. It never sends — that is the product, not a gap.
+can be used as-is or has to go to a human. The safe demo uses pasted sample messages. For an
+optional Telegram pilot, the same triage path writes drafts to a local approval queue and sends
+only after a human clicks approve. It never auto-sends — that is the product, not a gap.
 
 One sentence for why local: the data is exactly the kind you must not upload, and the corpus is
 small enough that a small local model with good retrieval beats a large remote one that cannot
@@ -54,6 +56,10 @@ Finish on the simulator, and specifically on the message that gets refused with 
 Refusal is the least common thing to demo and the most convincing; refusing inside a workflow that
 could plausibly have replied is better still.
 
+If showing the Telegram pilot as a second act, use only a pilot group and the local approval queue:
+polling creates a masked pending item, the operator reviews it, and Telegram receives the message
+only after the explicit approval click. Do not screenshot or commit the real approval queue.
+
 ## 5. Engineering decisions worth defending (1.5 min)
 
 Pick two or three; do not list all of them.
@@ -77,7 +83,8 @@ Say these before anyone asks:
   recommended.
 - No Turkish NER, so a name inside free-form prose can survive masking.
 - Single-turn; no conversation memory.
-- The simulator is a simulation. Messages are pasted in by hand; no group is connected.
+- The default demo is still a simulation. Telegram is an optional local pilot, not a public webhook
+  or automatic group bot.
 
 Knowing where a system is weak is part of shipping it.
 
@@ -97,5 +104,5 @@ Knowing where a system is weak is part of shipping it.
 | How do you know retrieval works? | An 18-question evaluation set: 10 in-scope answered, 8 out-of-scope refused with real embeddings. |
 | Could it update the roster automatically? | It could. It should not. It drafts; a human approves. |
 | Does it work on other WhatsApp exports? | Yes — both iOS and Android formats, six date variants, all tested. The instructor aliases are configuration. |
-| Why is it not connected to the real group? | The official WhatsApp API needs a reviewed business account; the unofficial route means automating WhatsApp Web against its terms of service. Neither belongs in a public repo built on other people's messages. |
+| Why is it not connected to the real WhatsApp group? | The official WhatsApp API cannot cover the existing large groups, and the unofficial route means automating WhatsApp Web against its terms of service. Neither belongs in a public repo built on other people's messages. Telegram is the optional pilot channel, with local polling and human approval. |
 | So could you add auto-reply? | Technically yes, and the triage boundary is already shaped for it. I left it out on purpose: the step that puts text in front of 500 people is the one worth keeping a human on. |
