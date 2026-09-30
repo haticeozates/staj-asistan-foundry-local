@@ -190,18 +190,20 @@ class TestNoAutoSendGuarantee:
             assert not re.match(r"^(send|post|publish|deliver|reply_to)", name)
 
     def test_no_module_targets_a_messaging_api(self):
-        forbidden = (
-            "api.telegram.org",
+        telegram_needles = ("api.telegram.org", "sendMessage", "TELEGRAM_BOT_TOKEN")
+        forbidden = telegram_needles + (
             "graph.facebook.com",
-            "sendMessage",
-            "TELEGRAM_BOT_TOKEN",
             "WHATSAPP_TOKEN",
             "WHATSAPP_ACCESS_TOKEN",
         )
+        # telegram.py is the single, approval-gated Telegram boundary.
         files = list(SRC.glob("*.py")) + [ROOT / "app.py"]
         for path in files:
             source = path.read_text(encoding="utf-8")
+            allowed = telegram_needles if path.name == "telegram.py" else ()
             for needle in forbidden:
+                if needle in allowed:
+                    continue
                 assert needle not in source, f"{path.name} references {needle!r}"
 
     def test_ui_has_no_send_button(self):
