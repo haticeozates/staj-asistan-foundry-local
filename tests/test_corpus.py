@@ -183,7 +183,7 @@ def test_unsafe_source_label_aborts_without_output(tmp_path, hashing_backend):
     assert not INDEX_DIR.exists()
 
 
-def test_unsafe_message_body_aborts_without_output(tmp_path, hashing_backend):
+def test_instructor_alias_in_body_is_redacted_before_index(tmp_path, hashing_backend):
     config = write_config(tmp_path)
     source = tmp_path / "synthetic-chat.txt"
     source.write_text(
@@ -192,10 +192,13 @@ def test_unsafe_message_body_aborts_without_output(tmp_path, hashing_backend):
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="privacy"):
-        build_private_index(config, [source], INDEX_DIR, hashing_backend, allow_hashing=True)
+    manifest = build_private_index(config, [source], INDEX_DIR, hashing_backend, allow_hashing=True)
 
-    assert not INDEX_DIR.exists()
+    assert manifest.privacy_scan_clean is True
+    assistant = load_private_assistant(INDEX_DIR)
+    texts = "\n".join(chunk.text for chunk in assistant.store.all_chunks())
+    assert SYNTHETIC_ALIAS.casefold() not in texts.casefold()
+    assert "Eğitmen" in texts
 
 
 def test_build_does_not_resolve_an_unneeded_llm(tmp_path, hashing_backend, monkeypatch):
@@ -359,3 +362,27 @@ def test_corpus_build_cli_prints_aggregate_counts_only(tmp_path, hashing_backend
     assert SYNTHETIC_ALIAS not in printed
     assert str(source) not in printed
     assert (INDEX_DIR / "manifest.json").exists()
+
+
+def test_telegram_poll_cli_fails_closed_without_token(tmp_path, monkeypatch, capsys):
+    write_config(tmp_path)
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+
+    result = main(["telegram", "poll", "--config", str(tmp_path / "config.json")])
+
+    printed = capsys.readouterr()
+    assert result == 2
+    assert "TELEGRAM_BOT_TOKEN" in printed.err
+    assert SYNTHETIC_ALIAS not in printed.out + printed.err
+
+
+def test_telegram_poll_cli_requires_allowed_chat_ids(tmp_path, monkeypatch, capsys):
+    write_config(tmp_path, allowed_telegram_chat_ids=[])
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123456:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+
+    result = main(["telegram", "poll", "--config", str(tmp_path / "config.json")])
+
+    printed = capsys.readouterr()
+    assert result == 2
+    assert "allowed Telegram chat IDs are required" in printed.err
+    assert "123456:" not in printed.out + printed.err

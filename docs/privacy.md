@@ -66,7 +66,14 @@ disk.
 ## Repository hygiene
 
 Ignored: `data/private/`, `data/raw/`, `*.zip`, `*_chat.txt`, image/audio/video extensions, local
-index files, `__pycache__`, `.DS_Store`, virtualenvs and `.env`.
+index files including the Telegram approval queue, `__pycache__`, `.DS_Store`, virtualenvs and
+`.env`. The committed `.env.example` contains only variable names.
+
+The Telegram poller masks each accepted message before it is written to SQLite. Chat IDs remain
+in that local database because the Bot API needs them to reply; they are not names, and they must
+not be committed. The bot token is read from `TELEGRAM_BOT_TOKEN` and is redacted in transport
+errors and logs. Instructor aliases live in ignored `data/private/config.json`, not in the
+persisted manifest.
 
 Committed: `data/samples/` only, containing anonymised content written for demonstration.
 

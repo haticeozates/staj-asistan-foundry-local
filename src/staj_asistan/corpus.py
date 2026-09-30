@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import tempfile
 from dataclasses import asdict, dataclass, replace
@@ -72,7 +73,24 @@ def _validated_output_dir(output_dir: Path) -> Path:
     return resolved
 
 
-def _sanitise_sources(sources: list[IngestedSource], base_label: str) -> list[IngestedSource]:
+_INSTRUCTOR_ROLE_LABEL = "Eğitmen"
+
+
+def _redact_aliases(text: str, aliases: tuple[str, ...]) -> str:
+    """Replace configured instructor names so they cannot survive in the index."""
+    redacted = text
+    for alias in sorted((item.strip() for item in aliases if item.strip()), key=len, reverse=True):
+        if len(alias) < 3:
+            continue
+        redacted = re.compile(re.escape(alias), re.IGNORECASE).sub(_INSTRUCTOR_ROLE_LABEL, redacted)
+    return redacted
+
+
+def _sanitise_sources(
+    sources: list[IngestedSource],
+    base_label: str,
+    aliases: tuple[str, ...],
+) -> list[IngestedSource]:
     sanitised: list[IngestedSource] = []
     for index, source in enumerate(sources, start=1):
         label = base_label if len(sources) == 1 else f"{base_label} {index}"
@@ -80,8 +98,9 @@ def _sanitise_sources(sources: list[IngestedSource], base_label: str) -> list[In
         source.messages = [
             replace(
                 message,
+                text=_redact_aliases(message.text, aliases),
                 source=label,
-                sender="Eğitmen" if message.is_instructor else message.sender,
+                sender=_INSTRUCTOR_ROLE_LABEL if message.is_instructor else message.sender,
             )
             for message in source.messages
         ]
@@ -165,7 +184,7 @@ def build_private_index(
 
         label = _safe_label(config, input_path, position)
         sources = ingest_bytes(data, input_path.name, instructor=instructor)
-        sources = _sanitise_sources(sources, label)
+        sources = _sanitise_sources(sources, label, config.instructor_aliases)
         assistant.add_sources(sources)
         input_hashes.append(digest)
         source_labels.extend(source.source for source in sources)
